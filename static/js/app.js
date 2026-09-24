@@ -200,7 +200,19 @@ async function apiRequest(endpoint, options = {}) {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.detail || "An error occurred");
+    let errMessage = "An error occurred";
+    if (data.detail) {
+      if (typeof data.detail === "string") {
+        errMessage = data.detail;
+      } else if (Array.isArray(data.detail)) {
+        errMessage = data.detail.map(d => (d.loc ? d.loc[d.loc.length - 1] + ": " : "") + (d.msg || JSON.stringify(d))).join(", ");
+      } else if (typeof data.detail === "object") {
+        errMessage = JSON.stringify(data.detail);
+      }
+    } else if (data.message) {
+      errMessage = data.message;
+    }
+    throw new Error(errMessage);
   }
   return data;
 }
@@ -323,13 +335,20 @@ async function handleRegister(e) {
     showToast("Profile photo is required. Please upload a file or take a live photo.", "error");
     return;
   }
+  const emailVal = (document.getElementById("reg-email").value || "").trim().toLowerCase();
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(emailVal)) {
+    showToast("Please enter a valid email address (e.g. anilkumar@gmail.com)", "error");
+    return;
+  }
+
   const payload = {
-    name: document.getElementById("reg-name").value,
-    email: document.getElementById("reg-email").value,
-    phone: document.getElementById("reg-phone").value,
+    name: document.getElementById("reg-name").value.trim(),
+    email: emailVal,
+    phone: document.getElementById("reg-phone").value.trim(),
     position: document.getElementById("reg-position").value,
-    expected_salary: parseFloat(document.getElementById("reg-salary").value),
-    address: document.getElementById("reg-address").value,
+    expected_salary: parseFloat(document.getElementById("reg-salary").value) || 18000,
+    address: document.getElementById("reg-address").value.trim(),
     password: document.getElementById("reg-password").value,
     profile_image: photoBase64 || null
   };

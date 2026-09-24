@@ -2,10 +2,11 @@ import os
 import sqlite3
 from datetime import datetime, date, timedelta
 from typing import Optional, List
-from fastapi import FastAPI, Depends, HTTPException, Query, status
+from fastapi import FastAPI, Depends, HTTPException, Query, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, EmailStr
 
 from app.database import get_db_connection, init_db
@@ -13,6 +14,20 @@ from app.auth import hash_password, verify_password, create_access_token, get_cu
 from app.services import log_audit, send_notification
 
 app = FastAPI(title="Courier Office Employee Management System API")
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    messages = []
+    for err in errors:
+        loc = err.get("loc", [])
+        field = loc[-1] if loc else "field"
+        msg = err.get("msg", "invalid")
+        messages.append(f"{field}: {msg}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": ", ".join(messages)}
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,7 +49,7 @@ class LoginRequest(BaseModel):
 
 class RegisterRequest(BaseModel):
     name: str
-    email: EmailStr
+    email: str
     phone: str
     password: str
     position: str
