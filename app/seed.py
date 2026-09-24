@@ -384,7 +384,7 @@ def seed_database():
     sample_notifications = [
         (2, "Advance Recorded", "₹2,000 has been recorded as an employee advance on 02 September 2026 at 03:45 PM.", "ADVANCE", 0),
         (3, "Advance Recorded", "₹3,500 has been recorded as an employee advance on 05 September 2026 at 11:20 AM.", "ADVANCE", 1),
-        (1, "Account Activated", "Welcome to SwiftRoute Courier! Your employee account has been approved and activated.", "ACCOUNT", 1),
+        (1, "Account Activated", "Welcome to AKR LOGISTICS! Your employee account has been approved and activated.", "ACCOUNT", 1),
         (2, "Salary Processed", "Your salary for August 2026 has been processed and credited to your account.", "SALARY", 1),
         (3, "Salary Processed", "Your salary for August 2026 has been processed and credited to your account.", "SALARY", 1),
         (4, "Salary Processed", "Your salary for August 2026 has been processed and credited to your account.", "SALARY", 1),

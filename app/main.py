@@ -40,6 +40,7 @@ class RegisterRequest(BaseModel):
     position: str
     address: Optional[str] = None
     expected_salary: Optional[float] = 18000.0
+    profile_image: Optional[str] = None
 
 class EmployeeCreate(BaseModel):
     name: str
@@ -53,6 +54,7 @@ class EmployeeCreate(BaseModel):
     joining_date: Optional[str] = None
     status: Optional[str] = "ACTIVE"
     account_status: Optional[str] = "ACTIVE"
+    profile_image: Optional[str] = None
 
 class EmployeeUpdate(BaseModel):
     name: Optional[str] = None
@@ -64,6 +66,10 @@ class EmployeeUpdate(BaseModel):
     working_days_per_month: Optional[int] = None
     status: Optional[str] = None
     account_status: Optional[str] = None
+    profile_image: Optional[str] = None
+
+class ProfileUpdate(BaseModel):
+    profile_image: str
 
 class AttendanceMark(BaseModel):
     employee_id: int
@@ -147,9 +153,9 @@ def register_worker(req: RegisterRequest):
     hashed = hash_password(req.password)
 
     cursor.execute("""
-        INSERT INTO users (employee_id, name, email, phone, password_hash, role, account_status, joining_date)
-        VALUES (?, ?, ?, ?, ?, 'WORKER', 'PENDING', ?)
-    """, (emp_code, req.name, req.email, req.phone, hashed, now_str))
+        INSERT INTO users (employee_id, name, email, phone, password_hash, role, account_status, profile_image, joining_date)
+        VALUES (?, ?, ?, ?, ?, 'WORKER', 'PENDING', ?, ?)
+    """, (emp_code, req.name, req.email, req.phone, hashed, req.profile_image, now_str))
     user_id = cursor.lastrowid
 
     sal = float(req.expected_salary or 18000.0)
@@ -222,9 +228,19 @@ def login(req: LoginRequest):
             "position": user["position"],
             "emp_table_id": user["emp_table_id"],
             "monthly_salary": user["monthly_salary"],
-            "daily_salary": user["daily_salary"]
+            "daily_salary": user["daily_salary"],
+            "profile_image": user["profile_image"]
         }
     }
+
+@app.post("/api/worker/profile-photo")
+def update_profile_photo(payload: ProfileUpdate, current_user: dict = Depends(get_current_user)):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET profile_image = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (payload.profile_image, current_user["id"]))
+    conn.commit()
+    conn.close()
+    return {"message": "Profile photo updated successfully", "profile_image": payload.profile_image}
 
 @app.get("/api/auth/me")
 def get_me(user: dict = Depends(get_current_user)):
@@ -472,9 +488,9 @@ def add_employee(req: EmployeeCreate, admin: dict = Depends(require_admin)):
     hashed = hash_password(req.password)
 
     cursor.execute("""
-        INSERT INTO users (employee_id, name, email, phone, password_hash, role, account_status, joining_date)
-        VALUES (?, ?, ?, ?, ?, 'WORKER', ?, ?)
-    """, (emp_code, req.name, req.email, req.phone, hashed, req.account_status or "ACTIVE", now_str))
+        INSERT INTO users (employee_id, name, email, phone, password_hash, role, account_status, profile_image, joining_date)
+        VALUES (?, ?, ?, ?, ?, 'WORKER', ?, ?, ?)
+    """, (emp_code, req.name, req.email, req.phone, hashed, req.account_status or "ACTIVE", req.profile_image, now_str))
     user_id = cursor.lastrowid
 
     working_days = req.working_days_per_month or 26
@@ -506,16 +522,17 @@ def update_employee(emp_id: int, req: EmployeeUpdate, admin: dict = Depends(requ
     user_id = emp["user_id"]
 
     # Update users table
-    if req.name or req.phone or req.account_status or req.email:
+    if req.name or req.phone or req.account_status or req.email or req.profile_image is not None:
         cursor.execute("""
             UPDATE users SET
                 name = COALESCE(?, name),
                 email = COALESCE(?, email),
                 phone = COALESCE(?, phone),
                 account_status = COALESCE(?, account_status),
+                profile_image = COALESCE(?, profile_image),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        """, (req.name, req.email, req.phone, req.account_status, user_id))
+        """, (req.name, req.email, req.phone, req.account_status, req.profile_image, user_id))
 
     # Update employees table
     monthly = req.monthly_salary if req.monthly_salary is not None else emp["monthly_salary"]

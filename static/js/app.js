@@ -181,8 +181,50 @@ async function handleLogin(e) {
   }
 }
 
+// Photo Helper: Compress and convert image file to Base64 data URL
+function previewRegisterPhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement("canvas");
+      const MAX_SIZE = 250;
+      let width = img.width;
+      let height = img.height;
+      if (width > height) {
+        if (width > MAX_SIZE) {
+          height *= MAX_SIZE / width;
+          width = MAX_SIZE;
+        }
+      } else {
+        if (height > MAX_SIZE) {
+          width *= MAX_SIZE / height;
+          height = MAX_SIZE;
+        }
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      document.getElementById("reg-photo-base64").value = dataUrl;
+      const previewDiv = document.getElementById("reg-photo-preview");
+      const previewImg = document.getElementById("reg-photo-img");
+      if (previewDiv && previewImg) {
+        previewImg.src = dataUrl;
+        previewDiv.style.display = "flex";
+      }
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 async function handleRegister(e) {
   e.preventDefault();
+  const photoBase64 = document.getElementById("reg-photo-base64") ? document.getElementById("reg-photo-base64").value : null;
   const payload = {
     name: document.getElementById("reg-name").value,
     email: document.getElementById("reg-email").value,
@@ -190,7 +232,8 @@ async function handleRegister(e) {
     position: document.getElementById("reg-position").value,
     expected_salary: parseFloat(document.getElementById("reg-salary").value),
     address: document.getElementById("reg-address").value,
-    password: document.getElementById("reg-password").value
+    password: document.getElementById("reg-password").value,
+    profile_image: photoBase64 || null
   };
 
   try {
@@ -215,6 +258,14 @@ function handleLogout() {
   showToast("Logged out successfully.", "info");
 }
 
+// Helper: Render Avatar (Image or Initial)
+function renderAvatarHtml(name, profileImage, size = 40, fontSize = 16) {
+  if (profileImage) {
+    return `<img src="${profileImage}" alt="${name}" style="width: ${size}px; height: ${size}px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.2);">`;
+  }
+  return `<div style="width: ${size}px; height: ${size}px; border-radius: 50%; background: #2563eb; color: white; display: flex; align-items: center; justify-content: center; font-size: ${fontSize}px; font-weight: 700;">${(name || 'U').charAt(0).toUpperCase()}</div>`;
+}
+
 // Initialize Application UI
 async function initApp() {
   const token = localStorage.getItem("courier_token");
@@ -234,8 +285,26 @@ async function initApp() {
   document.getElementById("sidebar-role-badge").innerText = currentUser.role === "ADMIN" ? "Courier Hub Admin" : "Worker Portal";
   document.getElementById("sidebar-user-name").innerText = currentUser.name;
   document.getElementById("sidebar-user-sub").innerText = currentUser.position || currentUser.role;
-  document.getElementById("sidebar-user-avatar").innerText = currentUser.name.charAt(0);
-  document.getElementById("topbar-avatar").innerText = currentUser.name.charAt(0);
+
+  // Set avatars
+  const sidebarAvatar = document.getElementById("sidebar-user-avatar");
+  if (sidebarAvatar) {
+    if (currentUser.profile_image) {
+      sidebarAvatar.innerHTML = `<img src="${currentUser.profile_image}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+    } else {
+      sidebarAvatar.innerText = currentUser.name.charAt(0).toUpperCase();
+    }
+  }
+
+  const topbarAvatar = document.getElementById("topbar-avatar");
+  if (topbarAvatar) {
+    if (currentUser.profile_image) {
+      topbarAvatar.innerHTML = `<img src="${currentUser.profile_image}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+    } else {
+      topbarAvatar.innerText = currentUser.name.charAt(0).toUpperCase();
+    }
+  }
+
   document.getElementById("topbar-name").innerText = currentUser.name;
 
   buildSidebarNavigation();
@@ -590,8 +659,13 @@ async function renderEmployeesView(container) {
                 <tr data-name="${emp.name.toLowerCase()}" data-code="${emp.employee_code.toLowerCase()}" data-status="${emp.account_status}">
                   <td><strong>${emp.employee_code}</strong></td>
                   <td>
-                    <div style="font-weight: 600;">${emp.name}</div>
-                    <div style="font-size: 12px; color: #64748b;">${emp.email}</div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      ${renderAvatarHtml(emp.name, emp.profile_image, 36, 14)}
+                      <div>
+                        <div style="font-weight: 600;">${emp.name}</div>
+                        <div style="font-size: 12px; color: #64748b;">${emp.email}</div>
+                      </div>
+                    </div>
                   </td>
                   <td>${emp.position}</td>
                   <td>${emp.phone || '-'}</td>
@@ -689,6 +763,15 @@ function openAddEmployeeModal() {
         <input type="text" id="add-address" class="form-control" placeholder="Complete residential address">
       </div>
       <div class="form-group">
+        <label>Profile Photo (Optional)</label>
+        <input type="file" id="add-photo-file" class="form-control" accept="image/*" onchange="previewAddEmpPhoto(event)">
+        <input type="hidden" id="add-photo-base64">
+        <div id="add-photo-preview" style="display: none; margin-top: 8px; align-items: center; gap: 10px;">
+          <img id="add-photo-img" src="" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid #2563eb;">
+          <span style="font-size: 12px; color: #10b981;">Photo attached</span>
+        </div>
+      </div>
+      <div class="form-group">
         <label>Password for Login *</label>
         <input type="password" id="add-password" class="form-control" required value="Worker@123">
       </div>
@@ -700,8 +783,72 @@ function openAddEmployeeModal() {
   `);
 }
 
+function previewAddEmpPhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement("canvas");
+      const MAX_SIZE = 250;
+      let width = img.width, height = img.height;
+      if (width > height) {
+        if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
+      } else {
+        if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
+      }
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      document.getElementById("add-photo-base64").value = dataUrl;
+      const previewDiv = document.getElementById("add-photo-preview");
+      const previewImg = document.getElementById("add-photo-img");
+      if (previewDiv && previewImg) {
+        previewImg.src = dataUrl;
+        previewDiv.style.display = "flex";
+      }
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function previewEditEmpPhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement("canvas");
+      const MAX_SIZE = 250;
+      let width = img.width, height = img.height;
+      if (width > height) {
+        if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
+      } else {
+        if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
+      }
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      document.getElementById("edit-photo-base64").value = dataUrl;
+      const previewImg = document.getElementById("edit-photo-img");
+      if (previewImg) {
+        previewImg.src = dataUrl;
+        previewImg.style.display = "block";
+      }
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 async function submitAddEmployee(e) {
   e.preventDefault();
+  const photoBase64 = document.getElementById("add-photo-base64") ? document.getElementById("add-photo-base64").value : null;
   const payload = {
     name: document.getElementById("add-name").value,
     email: document.getElementById("add-email").value,
@@ -711,7 +858,8 @@ async function submitAddEmployee(e) {
     working_days_per_month: parseInt(document.getElementById("add-working-days").value),
     joining_date: document.getElementById("add-joining").value,
     address: document.getElementById("add-address").value,
-    password: document.getElementById("add-password").value
+    password: document.getElementById("add-password").value,
+    profile_image: photoBase64 || null
   };
 
   try {
@@ -730,6 +878,14 @@ async function submitAddEmployee(e) {
 function openEditEmployeeModal(emp) {
   openModal(`Edit Employee - ${emp.name}`, `
     <form id="edit-emp-form" onsubmit="submitEditEmployee(event, ${emp.id})">
+      <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
+        ${renderAvatarHtml(emp.name, emp.profile_image, 56, 20)}
+        <div style="flex: 1;">
+          <label style="font-size: 13px; font-weight: 600;">Update Photo</label>
+          <input type="file" id="edit-photo-file" class="form-control" accept="image/*" onchange="previewEditEmpPhoto(event)">
+          <input type="hidden" id="edit-photo-base64" value="${emp.profile_image || ''}">
+        </div>
+      </div>
       <div class="form-group">
         <label>Full Name</label>
         <input type="text" id="edit-name" class="form-control" value="${emp.name}" required>
@@ -768,13 +924,15 @@ function openEditEmployeeModal(emp) {
 
 async function submitEditEmployee(e, empId) {
   e.preventDefault();
+  const photoBase64 = document.getElementById("edit-photo-base64") ? document.getElementById("edit-photo-base64").value : null;
   const payload = {
     name: document.getElementById("edit-name").value,
     email: document.getElementById("edit-email").value,
     phone: document.getElementById("edit-phone").value,
     position: document.getElementById("edit-position").value,
     monthly_salary: parseFloat(document.getElementById("edit-salary").value),
-    address: document.getElementById("edit-address").value
+    address: document.getElementById("edit-address").value,
+    profile_image: photoBase64 || null
   };
 
   try {
@@ -812,9 +970,7 @@ async function viewEmployeeProfile(empId) {
 
     openModal(`Employee Profile: ${emp.name}`, `
       <div style="display: flex; gap: 20px; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 16px; margin-bottom: 16px;">
-        <div style="width: 60px; height: 60px; border-radius: 50%; background: #2563eb; color: white; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold;">
-          ${emp.name.charAt(0)}
-        </div>
+        ${renderAvatarHtml(emp.name, emp.profile_image, 64, 24)}
         <div>
           <h2 style="font-size: 18px; margin-bottom: 4px;">${emp.name}</h2>
           <p style="font-size: 13px; color: #64748b;">${emp.position} • <strong>${emp.employee_code}</strong></p>
@@ -1757,7 +1913,7 @@ function viewPayslipModal(r) {
     <div class="payslip-container" id="printable-payslip">
       <div class="payslip-header">
         <div style="font-size: 24px;">🚚</div>
-        <h2>SWIFTROUTE LOGISTICS & COURIER SERVICES</h2>
+        <h2>AKR LOGISTICS</h2>
         <p style="font-size: 12px; color: #64748b;">Plot 14, Main Courier Hub, Express Freight Corridor</p>
         <div style="margin-top: 8px; font-weight: bold; font-size: 15px; color: #1e3a8a;">
           SALARY PAYSLIP - ${monthNames[r.month].toUpperCase()} ${r.year}
@@ -2145,7 +2301,7 @@ async function renderSettingsView(container) {
           <form id="settings-form" onsubmit="saveSettings(event)">
             <div class="form-group">
               <label>Company / Hub Name</label>
-              <input type="text" id="set-office-name" class="form-control" value="${s.office_name || 'SwiftRoute Courier Logistics'}" required>
+              <input type="text" id="set-office-name" class="form-control" value="${s.office_name || 'AKR LOGISTICS'}" required>
             </div>
             <div class="form-row">
               <div class="form-group">
@@ -2591,14 +2747,22 @@ async function renderWorkerProfileView(container) {
       </div>
       <div class="card-body">
         <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 20px;">
-          <div style="width: 70px; height: 70px; border-radius: 50%; background: #2563eb; color: white; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: bold;">
-            ${emp.name.charAt(0)}
+          <div id="worker-profile-avatar-container" style="position: relative;">
+            ${renderAvatarHtml(emp.name, emp.profile_image, 76, 28)}
+            <label for="worker-direct-photo-input" style="position: absolute; bottom: -4px; right: -4px; background: #2563eb; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.25);" title="Change Profile Photo">
+              📷
+            </label>
+            <input type="file" id="worker-direct-photo-input" style="display: none;" accept="image/*" onchange="uploadWorkerDirectPhoto(event)">
           </div>
           <div>
             <h3 style="font-size: 20px;">${emp.name}</h3>
-            <p style="color: #64748b; font-size: 14px;">${emp.position} • Employee ID: <strong>${emp.employee_id}</strong></p>
+            <p style="color: #64748b; font-size: 14px;">${emp.position} • Employee ID: <strong>${emp.employee_code || emp.employee_id}</strong></p>
             <span class="status-pill status-active" style="margin-top: 6px;">${emp.account_status}</span>
           </div>
+        </div>
+
+        <div style="padding: 10px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; margin-bottom: 18px; font-size: 13px; color: #166534; display: flex; align-items: center; gap: 8px;">
+          <span>📸</span> Tap the camera icon above to upload or update your profile picture.
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-size: 13.5px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
@@ -2612,6 +2776,50 @@ async function renderWorkerProfileView(container) {
       </div>
     </div>
   `;
+}
+
+function uploadWorkerDirectPhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = async function() {
+      const canvas = document.createElement("canvas");
+      const MAX_SIZE = 250;
+      let width = img.width, height = img.height;
+      if (width > height) {
+        if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
+      } else {
+        if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
+      }
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+
+      try {
+        const res = await apiRequest("/worker/profile-photo", {
+          method: "POST",
+          body: JSON.stringify({ profile_image: dataUrl })
+        });
+        showToast(res.message, "success");
+        if (currentUser) {
+          currentUser.profile_image = dataUrl;
+          localStorage.setItem("courier_user", JSON.stringify(currentUser));
+        }
+        renderWorkerProfileView(document.getElementById("view-container"));
+        const topbarAvatar = document.getElementById("topbar-avatar");
+        if (topbarAvatar) topbarAvatar.innerHTML = `<img src="${dataUrl}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+        const sidebarAvatar = document.getElementById("sidebar-user-avatar");
+        if (sidebarAvatar) sidebarAvatar.innerHTML = `<img src="${dataUrl}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 function toggleUserMenu() {

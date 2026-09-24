@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SwiftRoute Courier - Employee Management System</title>
+  <title>AKR LOGISTICS - Employee Management System</title>
   <link rel="stylesheet" href="/static/css/style.css">
   <!-- Chart.js for Admin Analytics -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -17,7 +17,7 @@
         <div style="width: 54px; height: 54px; background: linear-gradient(135deg, #2563eb, #f59e0b); border-radius: 14px; margin: 0 auto 14px auto; display: flex; align-items: center; justify-content: center; color: white; font-size: 26px; font-weight: bold; box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3);">
           🚚
         </div>
-        <h2 style="font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px;">SwiftRoute Logistics</h2>
+        <h2 style="font-size: 22px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px;">AKR LOGISTICS</h2>
         <p style="font-size: 13px; color: #64748b; margin-top: 4px;">Courier Office Employee Management System</p>
         
         <!-- Tab Toggle -->
@@ -88,6 +88,15 @@
             </div>
           </div>
           <div class="form-group">
+            <label>Profile Photo (Optional)</label>
+            <input type="file" id="reg-photo-file" class="form-control" accept="image/*" onchange="previewRegisterPhoto(event)">
+            <input type="hidden" id="reg-photo-base64">
+            <div id="reg-photo-preview" style="display: none; margin-top: 8px; align-items: center; gap: 10px;">
+              <img id="reg-photo-img" src="" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid #2563eb;">
+              <span style="font-size: 12px; color: #10b981;">Photo ready</span>
+            </div>
+          </div>
+          <div class="form-group">
             <label>Residential Address</label>
             <input type="text" id="reg-address" class="form-control" placeholder="Plot 10, Sector 5, Courier Hub Colony">
           </div>
@@ -111,7 +120,7 @@
       <div class="sidebar-header">
         <div class="brand-logo">🚚</div>
         <div>
-          <div class="brand-title">SwiftRoute Express</div>
+          <div class="brand-title">AKR LOGISTICS</div>
           <div class="brand-subtitle" id="sidebar-role-badge">Admin Portal</div>
         </div>
       </div>
@@ -177,6 +186,6 @@
   <div id="toast-container"></div>
 
   <!-- APPLICATION JAVASCRIPT -->
-  <script src="/static/js/app.js?v=2.1"></script>
+  <script src="/static/js/app.js?v=2.2"></script>
 </body>
 </html>

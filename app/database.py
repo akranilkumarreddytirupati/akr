@@ -169,10 +169,10 @@ def init_db():
         ("working_days_per_month", "26", "Default working days in a month for salary calculation"),
         ("weekly_off_day", "Sunday", "Default weekly off day"),
         ("leave_deduction_rule", "Unpaid", "Default leave deduction rule (Paid or Unpaid)"),
-        ("office_name", "SwiftRoute Courier & Express Logistics", "Company or branch name")
+        ("office_name", "AKR LOGISTICS", "Company or branch name")
     ]
     for key, val, desc in default_settings:
-        cursor.execute("INSERT OR IGNORE INTO system_settings (key, value, description) VALUES (?, ?, ?)", (key, val, desc))
+        cursor.execute("INSERT OR REPLACE INTO system_settings (key, value, description) VALUES (?, ?, ?)", (key, val, desc))
 
     # Ensure default Admin account exists
     cursor.execute("SELECT id FROM users WHERE role = 'ADMIN'")
