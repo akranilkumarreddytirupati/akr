@@ -821,17 +821,17 @@ async function renderEmployeesView(container) {
                   </td>
                   <td>
                     <div style="display: flex; gap: 5px; flex-wrap: wrap; align-items: center;">
-                      <button class="btn btn-secondary btn-sm" onclick="viewEmployeeProfile(${emp.id})" title="View Complete Profile">Profile</button>
-                      <button class="btn btn-secondary btn-sm" onclick="openEditEmployeeModal(${JSON.stringify(emp).replace(/"/g, '&quot;')})" title="Edit Details">Edit</button>
+                      <button class="btn btn-secondary btn-sm" onclick="viewEmployeeProfile(${emp.id})" title="View Complete Profile">👤 Profile</button>
+                      <button class="btn btn-secondary btn-sm" onclick="openEditEmployeeModal(${JSON.stringify(emp).replace(/"/g, '&quot;')})" title="Edit Details">✏️ Edit</button>
                       ${emp.account_status === 'PENDING' ? `
-                        <button class="btn btn-success btn-sm" onclick="changeEmployeeStatus(${emp.id}, 'APPROVE')" title="Approve Employee">Approve</button>
-                        <button class="btn btn-danger btn-sm" onclick="changeEmployeeStatus(${emp.id}, 'REJECT')" title="Reject Application">Reject</button>
+                        <button class="btn btn-success btn-sm" onclick="changeEmployeeStatus(${emp.id}, 'APPROVE')" title="Approve Employee">✓ Approve</button>
+                        <button class="btn btn-danger btn-sm" onclick="changeEmployeeStatus(${emp.id}, 'REJECT')" title="Reject Application">✕ Reject</button>
                       ` : emp.account_status === 'ACTIVE' ? `
-                        <button class="btn btn-warning btn-sm" onclick="changeEmployeeStatus(${emp.id}, 'DEACTIVATE')" title="Deactivate Employee">Deactivate</button>
+                        <button class="btn btn-warning btn-sm" onclick="changeEmployeeStatus(${emp.id}, 'DEACTIVATE')" title="Deactivate Employee">⏸️ Deactivate</button>
                       ` : `
-                        <button class="btn btn-success btn-sm" onclick="changeEmployeeStatus(${emp.id}, 'ACTIVATE')" title="Reactivate Employee">Activate</button>
+                        <button class="btn btn-success btn-sm" onclick="changeEmployeeStatus(${emp.id}, 'ACTIVATE')" title="Reactivate Employee">▶️ Activate</button>
                       `}
-                      <button class="btn btn-danger btn-sm" onclick="deleteEmployee(${emp.id}, '${emp.name.replace(/'/g, "\\'")}', '${emp.employee_code}')" title="Permanently Delete Employee">Remove</button>
+                      <button class="btn btn-danger btn-sm" onclick="deleteEmployee(${emp.id}, '${emp.name.replace(/'/g, "\\'")}', '${emp.employee_code}')" title="Permanently Delete Employee">🗑️ Remove</button>
                     </div>
                   </td>
                 </tr>

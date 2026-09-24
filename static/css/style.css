@@ -730,6 +730,14 @@ body {
   background-color: #dc2626;
 }
 
+.btn-warning {
+  background-color: var(--warning);
+  color: white;
+}
+.btn-warning:hover {
+  background-color: #ea580c;
+}
+
 .btn-sm {
   padding: 5px 10px;
   font-size: 12px;
