@@ -31,11 +31,11 @@
       <div id="login-container" style="padding: 24px 32px 32px 32px;">
         <form id="login-form" onsubmit="handleLogin(event)">
           <div class="form-group">
-            <label>Username / Email / Employee ID</label>
+            <label>Username / Email / Employee ID <span style="color: #ef4444; font-weight: bold;">*</span></label>
             <input type="text" id="login-username" class="form-control" placeholder="e.g. admin or EMP-0001 or email" required value="admin">
           </div>
           <div class="form-group">
-            <label>Password</label>
+            <label>Password <span style="color: #ef4444; font-weight: bold;">*</span></label>
             <input type="password" id="login-password" class="form-control" placeholder="••••••••" required value="Admin@123">
           </div>
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -52,22 +52,22 @@
       <div id="register-container" style="display: none; padding: 24px 32px 32px 32px;">
         <form id="register-form" onsubmit="handleRegister(event)">
           <div class="form-group">
-            <label>Full Name</label>
+            <label>Full Name <span style="color: #ef4444; font-weight: bold;">*</span></label>
             <input type="text" id="reg-name" class="form-control" placeholder="e.g. Rahul Sharma" required>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>Email Address</label>
+              <label>Email Address <span style="color: #ef4444; font-weight: bold;">*</span></label>
               <input type="email" id="reg-email" class="form-control" placeholder="rahul@courier.com" required>
             </div>
             <div class="form-group">
-              <label>Phone Number</label>
+              <label>Phone Number <span style="color: #ef4444; font-weight: bold;">*</span></label>
               <input type="tel" id="reg-phone" class="form-control" placeholder="+91 98765 00000" required>
             </div>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>Position / Role</label>
+              <label>Position / Role <span style="color: #ef4444; font-weight: bold;">*</span></label>
               <select id="reg-position" class="form-control" required>
                 <option value="Delivery Associate">Delivery Associate</option>
                 <option value="Counter Booking Specialist">Counter Booking Specialist</option>
@@ -76,12 +76,12 @@
               </select>
             </div>
             <div class="form-group">
-              <label>Expected Salary (₹)</label>
+              <label>Expected Salary (₹) <span style="color: #ef4444; font-weight: bold;">*</span></label>
               <input type="number" id="reg-salary" class="form-control" value="18000" required>
             </div>
           </div>
           <div class="form-group">
-            <label>Profile Photo (Upload or Take Live Photo)</label>
+            <label>Profile Photo <span style="color: #ef4444; font-weight: bold;">*</span> <span style="font-size: 11.5px; color: #64748b; font-weight: normal;">(Upload file or take live photo)</span></label>
             <div style="display: flex; gap: 8px; margin-bottom: 8px;">
               <label for="reg-photo-file" class="btn btn-secondary btn-sm" style="cursor: pointer; display: flex; align-items: center; gap: 6px; flex: 1; justify-content: center;">
                 📁 Choose File
@@ -98,11 +98,11 @@
             </div>
           </div>
           <div class="form-group">
-            <label>Residential Address</label>
-            <input type="text" id="reg-address" class="form-control" placeholder="Plot 10, Sector 5, Courier Hub Colony">
+            <label>Residential Address <span style="color: #ef4444; font-weight: bold;">*</span></label>
+            <input type="text" id="reg-address" class="form-control" placeholder="Plot 10, Sector 5, Courier Hub Colony" required>
           </div>
           <div class="form-group">
-            <label>Create Password</label>
+            <label>Create Password <span style="color: #ef4444; font-weight: bold;">*</span></label>
             <input type="password" id="reg-password" class="form-control" placeholder="••••••••" required minlength="6">
           </div>
           <button type="submit" class="btn btn-success" style="width: 100%; padding: 12px; font-size: 15px; font-weight: 700; margin-top: 8px;">Submit Registration</button>

@@ -319,6 +319,10 @@ function previewRegisterPhoto(event) {
 async function handleRegister(e) {
   e.preventDefault();
   const photoBase64 = document.getElementById("reg-photo-base64") ? document.getElementById("reg-photo-base64").value : null;
+  if (!photoBase64) {
+    showToast("Profile photo is required. Please upload a file or take a live photo.", "error");
+    return;
+  }
   const payload = {
     name: document.getElementById("reg-name").value,
     email: document.getElementById("reg-email").value,
