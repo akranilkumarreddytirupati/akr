@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-title" content="AKR LOGISTICS">
   <link rel="apple-touch-icon" href="/static/img/logo.jpg">
   <link rel="manifest" href="/static/manifest.json">
-  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/style.css?v=2.4">
   <!-- Chart.js for Admin Analytics -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
@@ -38,17 +38,16 @@
         <form id="login-form" onsubmit="handleLogin(event)">
           <div class="form-group">
             <label>Username / Email / Employee ID <span style="color: #ef4444; font-weight: bold;">*</span></label>
-            <input type="text" id="login-username" class="form-control" placeholder="e.g. admin or EMP-0001 or email" required value="admin">
+            <input type="text" id="login-username" class="form-control" placeholder="e.g. admin or EMP-0001 or email" required autocomplete="username">
           </div>
           <div class="form-group">
             <label>Password <span style="color: #ef4444; font-weight: bold;">*</span></label>
-            <input type="password" id="login-password" class="form-control" placeholder="••••••••" required value="Admin@123">
+            <input type="password" id="login-password" class="form-control" placeholder="••••••••" required autocomplete="current-password">
           </div>
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <label style="font-size: 12.5px; color: #64748b; display: flex; align-items: center; gap: 6px;">
               <input type="checkbox" checked> Remember me
             </label>
-            <span style="font-size: 12px; color: #2563eb; cursor: pointer;" onclick="showDemoCredentials()">Quick Logins</span>
           </div>
           <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 15px; font-weight: 700;">Sign In to Dashboard</button>
         </form>
@@ -119,16 +118,22 @@
 
   <!-- MAIN APP CONTAINER -->
   <div id="app-screen" class="app-container" style="display: none;">
+    <!-- Mobile Sidebar Backdrop Overlay -->
+    <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
     <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <div class="brand-logo">
-          <img src="/static/img/logo.jpg" alt="AKR LOGISTICS">
+      <div class="sidebar-header" style="justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div class="brand-logo">
+            <img src="/static/img/logo.jpg" alt="AKR LOGISTICS">
+          </div>
+          <div>
+            <div class="brand-title">AKR LOGISTICS</div>
+            <div class="brand-subtitle" id="sidebar-role-badge">Admin Portal</div>
+          </div>
         </div>
-        <div>
-          <div class="brand-title">AKR LOGISTICS</div>
-          <div class="brand-subtitle" id="sidebar-role-badge">Admin Portal</div>
-        </div>
+        <button type="button" class="btn-sidebar-close" onclick="toggleSidebar()" aria-label="Close menu">✕</button>
       </div>
 
       <!-- Navigation list will be rendered dynamically based on role -->
@@ -147,9 +152,16 @@
     <div class="main-wrapper">
       <!-- TOP NAVBAR -->
       <header class="top-navbar">
-        <div class="page-headline">
-          <h1 id="topbar-title">Dashboard</h1>
-          <p id="topbar-subtitle">Courier Hub Operations & Workforce Management</p>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <button type="button" class="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Toggle Navigation Menu">
+            <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+          <div class="page-headline">
+            <h1 id="topbar-title">Dashboard</h1>
+            <p id="topbar-subtitle">Courier Hub Operations & Workforce Management</p>
+          </div>
         </div>
 
         <div class="nav-actions">
@@ -193,6 +205,6 @@
   <div id="toast-container"></div>
 
   <!-- APPLICATION JAVASCRIPT -->
-  <script src="/static/js/app.js?v=2.3"></script>
+  <script src="/static/js/app.js?v=2.4"></script>
 </body>
 </html>

@@ -458,7 +458,30 @@ function buildSidebarNavigation() {
   });
 }
 
+function toggleSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  const overlay = document.getElementById("sidebar-overlay");
+  if (!sidebar) return;
+  const isOpen = sidebar.classList.toggle("open");
+  if (overlay) {
+    if (isOpen) overlay.classList.add("active");
+    else overlay.classList.remove("active");
+  }
+}
+
+function closeMobileSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  const overlay = document.getElementById("sidebar-overlay");
+  if (sidebar && sidebar.classList.contains("open")) {
+    sidebar.classList.remove("open");
+  }
+  if (overlay) {
+    overlay.classList.remove("active");
+  }
+}
+
 function navigateTo(viewId) {
+  closeMobileSidebar();
   currentView = viewId;
   buildSidebarNavigation();
 
