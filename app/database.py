@@ -1,9 +1,10 @@
 import sqlite3
 import os
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "courier_office.db")
+DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "courier_office.db"))
 
 def get_db_connection() -> sqlite3.Connection:
+    os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
@@ -172,6 +173,30 @@ def init_db():
     ]
     for key, val, desc in default_settings:
         cursor.execute("INSERT OR IGNORE INTO system_settings (key, value, description) VALUES (?, ?, ?)", (key, val, desc))
+
+    # Ensure default Admin account exists
+    cursor.execute("SELECT id FROM users WHERE role = 'ADMIN'")
+    if not cursor.fetchone():
+        import hashlib
+        import binascii
+        salt = hashlib.sha256(os.urandom(32)).hexdigest()[:16]
+        key = hashlib.pbkdf2_hmac('sha256', "Admin@123".encode('utf-8'), salt.encode('utf-8'), 100000)
+        admin_hash = f"{salt}${binascii.hexlify(key).decode('utf-8')}"
+
+        cursor.execute("""
+            INSERT INTO users (employee_id, name, email, phone, password_hash, role, account_status, profile_image, joining_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            "ADM-0001",
+            "Courier Hub Manager",
+            "admin@courier.com",
+            "+91 98765 43210",
+            admin_hash,
+            "ADMIN",
+            "ACTIVE",
+            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+            "2024-01-01"
+        ))
 
     conn.commit()
     conn.close()
