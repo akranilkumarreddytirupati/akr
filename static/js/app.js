@@ -1,3 +1,97 @@
+
+// ----------------- LIVE CAMERA SYSTEM -----------------
+let activeCameraStream = null;
+
+function openCameraModal(targetInputId, previewContainerId, previewImgId, onCapturedCallback) {
+  const container = document.getElementById("camera-modal-container");
+  container.innerHTML = `
+    <div class="modal-overlay active" id="active-camera-overlay" style="z-index: 99999;">
+      <div class="modal-content" style="max-width: 480px; text-align: center;">
+        <div class="modal-header">
+          <h3>📷 Capture Live Photo</h3>
+          <button class="modal-close" onclick="closeCameraModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 16px;">
+          <div style="width: 100%; height: 320px; background: #000; border-radius: 12px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center;">
+            <video id="camera-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+            <canvas id="camera-canvas" style="display: none;"></canvas>
+            <div id="camera-loading" style="position: absolute; color: white; font-size: 14px;">Starting camera...</div>
+          </div>
+          <div style="margin-top: 14px; display: flex; justify-content: center; gap: 12px;">
+            <button type="button" class="btn btn-secondary" onclick="closeCameraModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" id="snap-btn" style="padding: 10px 24px; font-weight: 700;" onclick="takeSnapshot('${targetInputId}', '${previewContainerId}', '${previewImgId}', ${onCapturedCallback ? onCapturedCallback : 'null'})">
+              📸 Capture Photo
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Start webcam / phone camera
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 640 } }, audio: false })
+    .then(stream => {
+      activeCameraStream = stream;
+      const video = document.getElementById("camera-video");
+      if (video) {
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+          video.play();
+          const loading = document.getElementById("camera-loading");
+          if (loading) loading.style.display = "none";
+        };
+      }
+    })
+    .catch(err => {
+      alert("Unable to access camera: " + err.message + ". Please allow camera permissions in your browser.");
+      closeCameraModal();
+    });
+}
+
+function takeSnapshot(targetInputId, previewContainerId, previewImgId, callback) {
+  const video = document.getElementById("camera-video");
+  const canvas = document.getElementById("camera-canvas");
+  if (!video || !canvas) return;
+
+  const size = Math.min(video.videoWidth || 400, video.videoHeight || 400);
+  canvas.width = 250;
+  canvas.height = 250;
+  const ctx = canvas.getContext("2d");
+
+  // Center crop square
+  const sx = ((video.videoWidth || 400) - size) / 2;
+  const sy = ((video.videoHeight || 400) - size) / 2;
+  ctx.drawImage(video, sx, sy, size, size, 0, 0, 250, 250);
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
+
+  if (targetInputId) {
+    const inp = document.getElementById(targetInputId);
+    if (inp) inp.value = dataUrl;
+  }
+
+  if (previewContainerId && previewImgId) {
+    const prevC = document.getElementById(previewContainerId);
+    const prevImg = document.getElementById(previewImgId);
+    if (prevImg) prevImg.src = dataUrl;
+    if (prevC) prevC.style.display = "flex";
+  }
+
+  closeCameraModal();
+
+  if (typeof callback === 'function') {
+    callback(dataUrl);
+  }
+}
+
+function closeCameraModal() {
+  if (activeCameraStream) {
+    activeCameraStream.getTracks().forEach(track => track.stop());
+    activeCameraStream = null;
+  }
+  const overlay = document.getElementById("active-camera-overlay");
+  if (overlay) overlay.remove();
+}
+
 // Courier Office Employee Management System - Modern Client SPA Logic
 
 const API_BASE = "/api";
@@ -763,12 +857,20 @@ function openAddEmployeeModal() {
         <input type="text" id="add-address" class="form-control" placeholder="Complete residential address">
       </div>
       <div class="form-group">
-        <label>Profile Photo (Optional)</label>
-        <input type="file" id="add-photo-file" class="form-control" accept="image/*" onchange="previewAddEmpPhoto(event)">
+        <label>Profile Photo (Upload or Take Live Photo)</label>
+        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+          <label for="add-photo-file" class="btn btn-secondary btn-sm" style="cursor: pointer; display: flex; align-items: center; gap: 6px; flex: 1; justify-content: center;">
+            📁 Choose File
+          </label>
+          <button type="button" class="btn btn-secondary btn-sm" style="display: flex; align-items: center; gap: 6px; flex: 1; justify-content: center;" onclick="openCameraModal('add-photo-base64', 'add-photo-preview', 'add-photo-img')">
+            📷 Take Live Photo
+          </button>
+        </div>
+        <input type="file" id="add-photo-file" style="display: none;" accept="image/*" onchange="previewAddEmpPhoto(event)">
         <input type="hidden" id="add-photo-base64">
         <div id="add-photo-preview" style="display: none; margin-top: 8px; align-items: center; gap: 10px;">
-          <img id="add-photo-img" src="" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid #2563eb;">
-          <span style="font-size: 12px; color: #10b981;">Photo attached</span>
+          <img id="add-photo-img" src="" style="width: 52px; height: 52px; border-radius: 50%; object-fit: cover; border: 2px solid #2563eb;">
+          <span style="font-size: 12px; color: #10b981; font-weight: 600;">✓ Photo attached</span>
         </div>
       </div>
       <div class="form-group">
@@ -879,10 +981,20 @@ function openEditEmployeeModal(emp) {
   openModal(`Edit Employee - ${emp.name}`, `
     <form id="edit-emp-form" onsubmit="submitEditEmployee(event, ${emp.id})">
       <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
-        ${renderAvatarHtml(emp.name, emp.profile_image, 56, 20)}
+        <div id="edit-photo-preview-box">
+          ${renderAvatarHtml(emp.name, emp.profile_image, 60, 22)}
+        </div>
         <div style="flex: 1;">
-          <label style="font-size: 13px; font-weight: 600;">Update Photo</label>
-          <input type="file" id="edit-photo-file" class="form-control" accept="image/*" onchange="previewEditEmpPhoto(event)">
+          <label style="font-size: 13px; font-weight: 600; margin-bottom: 6px; display: block;">Update Photo</label>
+          <div style="display: flex; gap: 8px;">
+            <label for="edit-photo-file" class="btn btn-secondary btn-sm" style="cursor: pointer; display: flex; align-items: center; gap: 4px;">
+              📁 File
+            </label>
+            <button type="button" class="btn btn-secondary btn-sm" style="display: flex; align-items: center; gap: 4px;" onclick="openCameraModal('edit-photo-base64', null, null, onEditEmpCameraCapture)">
+              📷 Live Camera
+            </button>
+          </div>
+          <input type="file" id="edit-photo-file" style="display: none;" accept="image/*" onchange="previewEditEmpPhoto(event)">
           <input type="hidden" id="edit-photo-base64" value="${emp.profile_image || ''}">
         </div>
       </div>
@@ -2761,8 +2873,18 @@ async function renderWorkerProfileView(container) {
           </div>
         </div>
 
-        <div style="padding: 10px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; margin-bottom: 18px; font-size: 13px; color: #166534; display: flex; align-items: center; gap: 8px;">
-          <span>📸</span> Tap the camera icon above to upload or update your profile picture.
+        <div style="padding: 12px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+          <div style="font-size: 13px; color: #166534;">
+            <strong>Profile Photo:</strong> Update your profile picture anytime.
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <label for="worker-direct-photo-input" class="btn btn-secondary btn-sm" style="cursor: pointer; display: flex; align-items: center; gap: 4px;">
+              📁 File
+            </label>
+            <button type="button" class="btn btn-primary btn-sm" style="display: flex; align-items: center; gap: 4px;" onclick="triggerWorkerLiveCamera()">
+              📷 Live Camera
+            </button>
+          </div>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-size: 13.5px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
@@ -2838,3 +2960,32 @@ function toggleUserMenu() {
 window.addEventListener("DOMContentLoaded", () => {
   initApp();
 });
+
+function onEditEmpCameraCapture(dataUrl) {
+  document.getElementById("edit-photo-base64").value = dataUrl;
+  const box = document.getElementById("edit-photo-preview-box");
+  if (box) box.innerHTML = `<img src="${dataUrl}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid #2563eb;">`;
+}
+
+function triggerWorkerLiveCamera() {
+  openCameraModal(null, null, null, async (dataUrl) => {
+    try {
+      const res = await apiRequest("/worker/profile-photo", {
+        method: "POST",
+        body: JSON.stringify({ profile_image: dataUrl })
+      });
+      showToast(res.message, "success");
+      if (currentUser) {
+        currentUser.profile_image = dataUrl;
+        localStorage.setItem("courier_user", JSON.stringify(currentUser));
+      }
+      renderWorkerProfileView(document.getElementById("view-container"));
+      const topbarAvatar = document.getElementById("topbar-avatar");
+      if (topbarAvatar) topbarAvatar.innerHTML = `<img src="${dataUrl}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+      const sidebarAvatar = document.getElementById("sidebar-user-avatar");
+      if (sidebarAvatar) sidebarAvatar.innerHTML = `<img src="${dataUrl}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  });
+}

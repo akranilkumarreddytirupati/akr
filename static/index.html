@@ -14,8 +14,8 @@
   <div id="auth-screen" style="display: none; min-height: 100vh; align-items: center; justify-content: center; background: linear-gradient(135deg, #0f172a, #1e3a8a); padding: 20px;">
     <div style="background: white; border-radius: 16px; width: 100%; max-width: 440px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); overflow: hidden;">
       <div style="padding: 32px 32px 20px 32px; text-align: center; border-bottom: 1px solid #f1f5f9;">
-        <div style="width: 54px; height: 54px; background: linear-gradient(135deg, #2563eb, #f59e0b); border-radius: 14px; margin: 0 auto 14px auto; display: flex; align-items: center; justify-content: center; color: white; font-size: 26px; font-weight: bold; box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3);">
-          🚚
+        <div style="width: 64px; height: 64px; border-radius: 14px; margin: 0 auto 12px auto; overflow: hidden; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25); border: 2px solid #e2e8f0;">
+          <img src="/static/img/logo.jpg" alt="AKR LOGISTICS" style="width: 100%; height: 100%; object-fit: cover;">
         </div>
         <h2 style="font-size: 22px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px;">AKR LOGISTICS</h2>
         <p style="font-size: 13px; color: #64748b; margin-top: 4px;">Courier Office Employee Management System</p>
@@ -46,13 +46,6 @@
           </div>
           <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 15px; font-weight: 700;">Sign In to Dashboard</button>
         </form>
-
-        <div style="margin-top: 18px; padding: 12px; background: #f8fafc; border-radius: 8px; font-size: 12px; color: #475569; border: 1px dashed #cbd5e1;">
-          <strong>Admin Login Credentials:</strong><br>
-          • <strong>Username:</strong> <code>admin</code> or <code>admin@courier.com</code><br>
-          • <strong>Password:</strong> <code>Admin@123</code><br>
-          <span style="color: #10b981; font-weight: 600; font-size: 11px;">✓ Database is clean and ready for your real employee records!</span>
-        </div>
       </div>
 
       <!-- Worker Register Form -->
@@ -88,12 +81,20 @@
             </div>
           </div>
           <div class="form-group">
-            <label>Profile Photo (Optional)</label>
-            <input type="file" id="reg-photo-file" class="form-control" accept="image/*" onchange="previewRegisterPhoto(event)">
+            <label>Profile Photo (Upload or Take Live Photo)</label>
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+              <label for="reg-photo-file" class="btn btn-secondary btn-sm" style="cursor: pointer; display: flex; align-items: center; gap: 6px; flex: 1; justify-content: center;">
+                📁 Choose File
+              </label>
+              <button type="button" class="btn btn-secondary btn-sm" style="display: flex; align-items: center; gap: 6px; flex: 1; justify-content: center;" onclick="openCameraModal('reg-photo-base64', 'reg-photo-preview', 'reg-photo-img')">
+                📷 Take Live Photo
+              </button>
+            </div>
+            <input type="file" id="reg-photo-file" style="display: none;" accept="image/*" onchange="previewRegisterPhoto(event)">
             <input type="hidden" id="reg-photo-base64">
             <div id="reg-photo-preview" style="display: none; margin-top: 8px; align-items: center; gap: 10px;">
-              <img id="reg-photo-img" src="" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid #2563eb;">
-              <span style="font-size: 12px; color: #10b981;">Photo ready</span>
+              <img id="reg-photo-img" src="" style="width: 52px; height: 52px; border-radius: 50%; object-fit: cover; border: 2px solid #2563eb;">
+              <span style="font-size: 12px; color: #10b981; font-weight: 600;">✓ Photo attached</span>
             </div>
           </div>
           <div class="form-group">
@@ -104,10 +105,7 @@
             <label>Create Password</label>
             <input type="password" id="reg-password" class="form-control" placeholder="••••••••" required minlength="6">
           </div>
-          <div style="background: #fffbeb; border: 1px solid #fef3c7; padding: 10px; border-radius: 6px; font-size: 12px; color: #92400e; margin-bottom: 16px;">
-            ⚠️ <strong>Admin Approval Required:</strong> Your account will be created with <strong>Pending</strong> status until verified by management.
-          </div>
-          <button type="submit" class="btn btn-success" style="width: 100%; padding: 12px; font-size: 15px; font-weight: 700;">Submit Registration</button>
+          <button type="submit" class="btn btn-success" style="width: 100%; padding: 12px; font-size: 15px; font-weight: 700; margin-top: 8px;">Submit Registration</button>
         </form>
       </div>
     </div>
@@ -118,7 +116,9 @@
     <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <div class="brand-logo">🚚</div>
+        <div class="brand-logo">
+          <img src="/static/img/logo.jpg" alt="AKR LOGISTICS">
+        </div>
         <div>
           <div class="brand-title">AKR LOGISTICS</div>
           <div class="brand-subtitle" id="sidebar-role-badge">Admin Portal</div>
@@ -181,11 +181,12 @@
 
   <!-- MODALS CONTAINER -->
   <div id="modal-container"></div>
+  <div id="camera-modal-container"></div>
 
   <!-- TOAST CONTAINER -->
   <div id="toast-container"></div>
 
   <!-- APPLICATION JAVASCRIPT -->
-  <script src="/static/js/app.js?v=2.2"></script>
+  <script src="/static/js/app.js?v=2.3"></script>
 </body>
 </html>
