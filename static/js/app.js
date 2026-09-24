@@ -820,16 +820,18 @@ async function renderEmployeesView(container) {
                     </span>
                   </td>
                   <td>
-                    <div style="display: flex; gap: 6px;">
+                    <div style="display: flex; gap: 5px; flex-wrap: wrap; align-items: center;">
                       <button class="btn btn-secondary btn-sm" onclick="viewEmployeeProfile(${emp.id})" title="View Complete Profile">Profile</button>
                       <button class="btn btn-secondary btn-sm" onclick="openEditEmployeeModal(${JSON.stringify(emp).replace(/"/g, '&quot;')})" title="Edit Details">Edit</button>
                       ${emp.account_status === 'PENDING' ? `
-                        <button class="btn btn-success btn-sm" onclick="changeEmployeeStatus(${emp.id}, 'APPROVE')">Approve</button>
+                        <button class="btn btn-success btn-sm" onclick="changeEmployeeStatus(${emp.id}, 'APPROVE')" title="Approve Employee">Approve</button>
+                        <button class="btn btn-danger btn-sm" onclick="changeEmployeeStatus(${emp.id}, 'REJECT')" title="Reject Application">Reject</button>
                       ` : emp.account_status === 'ACTIVE' ? `
-                        <button class="btn btn-danger btn-sm" onclick="changeEmployeeStatus(${emp.id}, 'DEACTIVATE')">Deactivate</button>
+                        <button class="btn btn-warning btn-sm" onclick="changeEmployeeStatus(${emp.id}, 'DEACTIVATE')" title="Deactivate Employee">Deactivate</button>
                       ` : `
-                        <button class="btn btn-success btn-sm" onclick="changeEmployeeStatus(${emp.id}, 'ACTIVATE')">Activate</button>
+                        <button class="btn btn-success btn-sm" onclick="changeEmployeeStatus(${emp.id}, 'ACTIVATE')" title="Reactivate Employee">Activate</button>
                       `}
+                      <button class="btn btn-danger btn-sm" onclick="deleteEmployee(${emp.id}, '${emp.name.replace(/'/g, "\\'")}', '${emp.employee_code}')" title="Permanently Delete Employee">Remove</button>
                     </div>
                   </td>
                 </tr>
@@ -1107,11 +1109,33 @@ async function submitEditEmployee(e, empId) {
 }
 
 async function changeEmployeeStatus(empId, action) {
-  if (!confirm(`Are you sure you want to ${action} this employee account?`)) return;
+  const actionLabels = {
+    APPROVE: "approve",
+    REJECT: "reject and deactivate",
+    ACTIVATE: "activate",
+    DEACTIVATE: "deactivate"
+  };
+  const label = actionLabels[action] || action.toLowerCase();
+  if (!confirm(`Are you sure you want to ${label} this employee?`)) return;
   try {
     const res = await apiRequest(`/admin/employees/${empId}/status`, {
       method: "POST",
       body: JSON.stringify({ action })
+    });
+    showToast(res.message, "success");
+    renderEmployeesView(document.getElementById("view-container"));
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+async function deleteEmployee(empId, empName, empCode) {
+  const confirmMsg = `⚠️ WARNING: Are you sure you want to permanently remove employee "${empName}" (${empCode})?\n\nThis will permanently delete their account, attendance logs, and records. This action CANNOT be undone!`;
+  if (!confirm(confirmMsg)) return;
+
+  try {
+    const res = await apiRequest(`/admin/employees/${empId}`, {
+      method: "DELETE"
     });
     showToast(res.message, "success");
     renderEmployeesView(document.getElementById("view-container"));

@@ -596,6 +596,11 @@ def change_employee_status(emp_id: int, payload: dict, admin: dict = Depends(req
         cursor.execute("UPDATE employees SET status = 'INACTIVE' WHERE id = ?", (emp_id,))
         log_audit(conn, admin["name"], "Deactivated employee", f"{emp['name']} ({emp['employee_code']})")
         send_notification(conn, user_id, "Account Deactivated", "Your courier employee account has been deactivated. Contact admin for assistance.", "ACCOUNT")
+    elif action == "REJECT":
+        cursor.execute("UPDATE users SET account_status = 'DEACTIVATED' WHERE id = ?", (user_id,))
+        cursor.execute("UPDATE employees SET status = 'INACTIVE' WHERE id = ?", (emp_id,))
+        log_audit(conn, admin["name"], "Rejected employee application", f"{emp['name']} ({emp['employee_code']})")
+        send_notification(conn, user_id, "Application Rejected", "Your worker registration application was reviewed and rejected by the administrator.", "ACCOUNT")
     else:
         conn.close()
         raise HTTPException(status_code=400, detail="Invalid action")
@@ -603,6 +608,36 @@ def change_employee_status(emp_id: int, payload: dict, admin: dict = Depends(req
     conn.commit()
     conn.close()
     return {"message": f"Employee status updated to {action}"}
+
+@app.delete("/api/admin/employees/{emp_id}")
+def delete_employee(emp_id: int, admin: dict = Depends(require_admin)):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT e.*, u.name, u.id as user_id FROM employees e JOIN users u ON e.user_id = u.id WHERE e.id = ?", (emp_id,))
+    emp = cursor.fetchone()
+    if not emp:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    user_id = emp["user_id"]
+    emp_name = emp["name"]
+    emp_code = emp["employee_code"]
+
+    # Delete related attendance, advances, salary_records (cascades or delete explicitly)
+    cursor.execute("DELETE FROM attendance WHERE employee_id = ?", (emp_id,))
+    cursor.execute("DELETE FROM advances WHERE employee_id = ?", (emp_id,))
+    cursor.execute("DELETE FROM salary_payments WHERE employee_id = ?", (emp_id,))
+    cursor.execute("DELETE FROM salary_records WHERE employee_id = ?", (emp_id,))
+    cursor.execute("DELETE FROM notifications WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM employees WHERE id = ?", (emp_id,))
+    cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
+    log_audit(conn, admin["name"], "Removed/Deleted employee", f"{emp_name} ({emp_code})", "Employee and all related records removed from system.")
+
+    conn.commit()
+    conn.close()
+    return {"message": f"Employee {emp_name} ({emp_code}) removed successfully"}
 
 # ----------------- Attendance Management -----------------
 
