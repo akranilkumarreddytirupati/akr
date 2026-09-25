@@ -191,14 +191,17 @@ async function apiRequest(endpoint, options = {}) {
     headers
   });
 
+  const data = await response.json().catch(() => ({}));
+
   if (response.status === 401) {
-    localStorage.removeItem("courier_token");
-    localStorage.removeItem("courier_user");
-    initAuth();
-    throw new Error("Session expired. Please log in again.");
+    if (!endpoint.includes("/auth/login")) {
+      localStorage.removeItem("courier_token");
+      localStorage.removeItem("courier_user");
+      initAuth();
+      throw new Error("Session expired. Please log in again.");
+    }
   }
 
-  const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     let errMessage = "An error occurred";
     if (data.detail) {

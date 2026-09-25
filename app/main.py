@@ -10,6 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, EmailStr
 
 from app.database import get_db_connection, init_db
+from app.seed import seed_database
 from app.auth import hash_password, verify_password, create_access_token, get_current_user, require_admin, require_worker
 from app.services import log_audit, send_notification
 
@@ -40,6 +41,7 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     init_db()
+    seed_database()
 
 # ----------------- Pydantic Models -----------------
 
@@ -205,13 +207,18 @@ def login(req: LoginRequest):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Allow login via email or employee_id/username
+    raw_val = (req.username_or_email or "").strip()
+    lower_val = raw_val.lower()
+
+    # Allow login via email or employee_id/username (case-insensitive & trimmed)
     cursor.execute("""
         SELECT u.*, e.id as emp_table_id, e.employee_code, e.position, e.monthly_salary, e.daily_salary
         FROM users u
         LEFT JOIN employees e ON u.id = e.user_id
-        WHERE u.email = ? OR u.employee_id = ? OR (u.role = 'ADMIN' AND ? = 'admin')
-    """, (req.username_or_email, req.username_or_email, req.username_or_email))
+        WHERE LOWER(TRIM(u.email)) = ? 
+           OR LOWER(TRIM(u.employee_id)) = ? 
+           OR (u.role = 'ADMIN' AND ? = 'admin')
+    """, (lower_val, lower_val, lower_val))
     user = cursor.fetchone()
     conn.close()
 
