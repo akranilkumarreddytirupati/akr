@@ -92,6 +92,35 @@ class EmployeeUpdate(BaseModel):
     status: Optional[str] = None
     account_status: Optional[str] = None
     profile_image: Optional[str] = None
+    password: Optional[str] = None
+
+class VehicleCreate(BaseModel):
+    vehicle_number: str
+    model_name: Optional[str] = None
+    vehicle_type: Optional[str] = "Delivery Van"
+    status: Optional[str] = "AVAILABLE"
+    notes: Optional[str] = None
+
+class TripCreate(BaseModel):
+    vehicle_id: int
+    driver_id: int
+    helper_id: Optional[int] = None
+    trip_date: Optional[str] = None
+    trip_start_time: Optional[str] = None
+    trip_end_time: Optional[str] = None
+    start_location: Optional[str] = "Hub"
+    destination: str
+    purpose: Optional[str] = "Parcel Delivery"
+    status: Optional[str] = "IN_PROGRESS"
+    start_km: Optional[float] = 0.0
+    end_km: Optional[float] = 0.0
+    notes: Optional[str] = None
+
+class TripUpdate(BaseModel):
+    trip_end_time: Optional[str] = None
+    end_km: Optional[float] = None
+    status: Optional[str] = None # IN_PROGRESS, COMPLETED, CANCELLED
+    notes: Optional[str] = None
 
 class ProfileUpdate(BaseModel):
     profile_image: str
@@ -178,9 +207,9 @@ def register_worker(req: RegisterRequest):
     hashed = hash_password(req.password)
 
     cursor.execute("""
-        INSERT INTO users (employee_id, name, email, phone, password_hash, role, account_status, profile_image, joining_date)
-        VALUES (?, ?, ?, ?, ?, 'WORKER', 'PENDING', ?, ?)
-    """, (emp_code, req.name, req.email, req.phone, hashed, req.profile_image, now_str))
+        INSERT INTO users (employee_id, name, email, phone, password_hash, plain_password, role, account_status, profile_image, joining_date)
+        VALUES (?, ?, ?, ?, ?, ?, 'WORKER', 'PENDING', ?, ?)
+    """, (emp_code, req.name, req.email, req.phone, hashed, req.password, req.profile_image, now_str))
     user_id = cursor.lastrowid
 
     sal = float(req.expected_salary or 18000.0)
@@ -205,6 +234,7 @@ def register_worker(req: RegisterRequest):
         "email": req.email,
         "phone": req.phone,
         "password_hash": hashed,
+        "plain_password": req.password,
         "role": "WORKER",
         "account_status": "PENDING",
         "profile_image": req.profile_image,
@@ -455,6 +485,7 @@ def get_employees(
 
     query = """
         SELECT e.*, u.name, u.email, u.phone, u.role, u.account_status, u.profile_image, u.joining_date,
+               u.plain_password, u.employee_id as username,
                (SELECT SUM(amount - deducted_amount) FROM advances WHERE employee_id = e.id AND status != 'Deducted') as total_advance_outstanding
         FROM employees e
         JOIN users u ON e.user_id = u.id
@@ -484,7 +515,8 @@ def get_employee_profile(emp_id: int, _admin: dict = Depends(require_admin)):
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT e.*, u.name, u.email, u.phone, u.role, u.account_status, u.profile_image, u.joining_date
+        SELECT e.*, u.name, u.email, u.phone, u.role, u.account_status, u.profile_image, u.joining_date,
+               u.plain_password, u.employee_id as username
         FROM employees e
         JOIN users u ON e.user_id = u.id
         WHERE e.id = ?
@@ -542,9 +574,9 @@ def add_employee(req: EmployeeCreate, admin: dict = Depends(require_admin)):
     hashed = hash_password(req.password)
 
     cursor.execute("""
-        INSERT INTO users (employee_id, name, email, phone, password_hash, role, account_status, profile_image, joining_date)
-        VALUES (?, ?, ?, ?, ?, 'WORKER', ?, ?, ?)
-    """, (emp_code, req.name, req.email, req.phone, hashed, req.account_status or "ACTIVE", req.profile_image, now_str))
+        INSERT INTO users (employee_id, name, email, phone, password_hash, plain_password, role, account_status, profile_image, joining_date)
+        VALUES (?, ?, ?, ?, ?, ?, 'WORKER', ?, ?, ?)
+    """, (emp_code, req.name, req.email, req.phone, hashed, req.password, req.account_status or "ACTIVE", req.profile_image, now_str))
     user_id = cursor.lastrowid
 
     working_days = req.working_days_per_month or 26
@@ -559,6 +591,34 @@ def add_employee(req: EmployeeCreate, admin: dict = Depends(require_admin)):
     send_notification(conn, user_id, "Welcome to Courier Hub!", f"Your employee account ({emp_code}) has been created by the administration.", "ACCOUNT")
 
     conn.commit()
+
+    # Sync to Firestore
+    sync_document_to_firestore("users", str(user_id), {
+        "id": user_id,
+        "employee_id": emp_code,
+        "name": req.name,
+        "email": req.email,
+        "phone": req.phone,
+        "password_hash": hashed,
+        "plain_password": req.password,
+        "role": "WORKER",
+        "account_status": req.account_status or "ACTIVE",
+        "profile_image": req.profile_image,
+        "joining_date": now_str
+    })
+    sync_document_to_firestore("employees", str(emp_id), {
+        "id": emp_id,
+        "user_id": user_id,
+        "employee_code": emp_code,
+        "position": req.position,
+        "address": req.address,
+        "monthly_salary": req.monthly_salary,
+        "daily_salary": daily_sal,
+        "salary_effective_date": now_str,
+        "status": req.status or "ACTIVE",
+        "working_days_per_month": working_days
+    })
+
     conn.close()
     return {"message": "Employee added successfully", "employee_id": emp_id, "employee_code": emp_code}
 
@@ -576,7 +636,8 @@ def update_employee(emp_id: int, req: EmployeeUpdate, admin: dict = Depends(requ
     user_id = emp["user_id"]
 
     # Update users table
-    if req.name or req.phone or req.account_status or req.email or req.profile_image is not None:
+    if req.name or req.phone or req.account_status or req.email or req.profile_image is not None or req.password:
+        pw_hash = hash_password(req.password) if req.password else None
         cursor.execute("""
             UPDATE users SET
                 name = COALESCE(?, name),
@@ -584,9 +645,11 @@ def update_employee(emp_id: int, req: EmployeeUpdate, admin: dict = Depends(requ
                 phone = COALESCE(?, phone),
                 account_status = COALESCE(?, account_status),
                 profile_image = COALESCE(?, profile_image),
+                password_hash = COALESCE(?, password_hash),
+                plain_password = COALESCE(?, plain_password),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        """, (req.name, req.email, req.phone, req.account_status, req.profile_image, user_id))
+        """, (req.name, req.email, req.phone, req.account_status, req.profile_image, pw_hash, req.password, user_id))
 
     # Update employees table
     monthly = req.monthly_salary if req.monthly_salary is not None else emp["monthly_salary"]
@@ -1506,6 +1569,214 @@ def update_settings(req: SettingsUpdate, admin: dict = Depends(require_admin)):
     conn.commit()
     conn.close()
     return {"message": "Settings updated successfully"}
+
+# ----------------- Vehicle & Trip Management -----------------
+
+@app.get("/api/vehicles")
+def get_vehicles(_user: dict = Depends(get_current_user)):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT v.*,
+               (SELECT COUNT(*) FROM vehicle_trips WHERE vehicle_id = v.id) as total_trips,
+               (SELECT trip_date FROM vehicle_trips WHERE vehicle_id = v.id ORDER BY id DESC LIMIT 1) as last_trip_date
+        FROM vehicles v
+        ORDER BY v.id ASC
+    """)
+    vehicles = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return vehicles
+
+@app.post("/api/admin/vehicles")
+def create_vehicle(req: VehicleCreate, admin: dict = Depends(require_admin)):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM vehicles WHERE vehicle_number = ?", (req.vehicle_number.strip().upper(),))
+    if cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=400, detail="Vehicle number already exists.")
+
+    cursor.execute("""
+        INSERT INTO vehicles (vehicle_number, model_name, vehicle_type, status, notes)
+        VALUES (?, ?, ?, ?, ?)
+    """, (req.vehicle_number.strip().upper(), req.model_name, req.vehicle_type or "Delivery Van", req.status or "AVAILABLE", req.notes))
+    v_id = cursor.lastrowid
+    log_audit(conn, admin["name"], "Added new vehicle", req.vehicle_number.strip().upper(), f"Type: {req.vehicle_type}")
+    conn.commit()
+    conn.close()
+    return {"message": "Vehicle added successfully", "vehicle_id": v_id}
+
+@app.put("/api/admin/vehicles/{vehicle_id}/status")
+def update_vehicle_status(vehicle_id: int, payload: dict, admin: dict = Depends(require_admin)):
+    st = payload.get("status")
+    if st not in ["AVAILABLE", "ON_TRIP", "MAINTENANCE"]:
+        raise HTTPException(status_code=400, detail="Invalid vehicle status.")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE vehicles SET status = ? WHERE id = ?", (st, vehicle_id))
+    log_audit(conn, admin["name"], "Updated vehicle status", f"Vehicle ID {vehicle_id}", f"Status: {st}")
+    conn.commit()
+    conn.close()
+    return {"message": "Vehicle status updated"}
+
+@app.delete("/api/admin/vehicles/{vehicle_id}")
+def delete_vehicle(vehicle_id: int, admin: dict = Depends(require_admin)):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM vehicles WHERE id = ?", (vehicle_id,))
+    log_audit(conn, admin["name"], "Deleted vehicle", f"Vehicle ID {vehicle_id}")
+    conn.commit()
+    conn.close()
+    return {"message": "Vehicle deleted successfully"}
+
+@app.get("/api/vehicle-trips")
+def get_vehicle_trips(
+    vehicle_id: Optional[int] = None,
+    driver_id: Optional[int] = None,
+    trip_date: Optional[str] = None,
+    _user: dict = Depends(get_current_user)
+):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    query = """
+        SELECT vt.*,
+               v.vehicle_number, v.model_name, v.vehicle_type,
+               du.name as driver_name, de.employee_code as driver_code, du.phone as driver_phone,
+               hu.name as helper_name, he.employee_code as helper_code, hu.phone as helper_phone
+        FROM vehicle_trips vt
+        JOIN vehicles v ON vt.vehicle_id = v.id
+        JOIN employees de ON vt.driver_id = de.id
+        JOIN users du ON de.user_id = du.id
+        LEFT JOIN employees he ON vt.helper_id = he.id
+        LEFT JOIN users hu ON he.user_id = hu.id
+        WHERE 1=1
+    """
+    params = []
+    if vehicle_id:
+        query += " AND vt.vehicle_id = ?"
+        params.append(vehicle_id)
+    if driver_id:
+        query += " AND (vt.driver_id = ? OR vt.helper_id = ?)"
+        params.extend([driver_id, driver_id])
+    if trip_date:
+        query += " AND vt.trip_date = ?"
+        params.append(trip_date)
+
+    query += " ORDER BY vt.trip_date DESC, vt.id DESC"
+    cursor.execute(query, params)
+    trips = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return trips
+
+@app.post("/api/admin/vehicle-trips")
+def create_vehicle_trip(req: TripCreate, admin: dict = Depends(require_admin)):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Verify vehicle
+    cursor.execute("SELECT * FROM vehicles WHERE id = ?", (req.vehicle_id,))
+    veh = cursor.fetchone()
+    if not veh:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+
+    # Verify driver
+    cursor.execute("SELECT e.*, u.name, u.id as user_id FROM employees e JOIN users u ON e.user_id = u.id WHERE e.id = ?", (req.driver_id,))
+    driver = cursor.fetchone()
+    if not driver:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Driver employee not found")
+
+    helper_name = None
+    if req.helper_id:
+        cursor.execute("SELECT e.*, u.name, u.id as user_id FROM employees e JOIN users u ON e.user_id = u.id WHERE e.id = ?", (req.helper_id,))
+        helper = cursor.fetchone()
+        if helper:
+            helper_name = helper["name"]
+
+    t_date = req.trip_date or date.today().strftime("%Y-%m-%d")
+    t_time = req.trip_start_time or datetime.now().strftime("%I:%M %p")
+
+    cursor.execute("""
+        INSERT INTO vehicle_trips (
+            vehicle_id, driver_id, helper_id, trip_date, trip_start_time, trip_end_time,
+            start_location, destination, purpose, status, start_km, end_km, notes
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        req.vehicle_id, req.driver_id, req.helper_id, t_date, t_time, req.trip_end_time,
+        req.start_location or "Hub", req.destination, req.purpose or "Parcel Delivery",
+        req.status or "IN_PROGRESS", req.start_km or 0.0, req.end_km or 0.0, req.notes
+    ))
+    trip_id = cursor.lastrowid
+
+    # Update vehicle status to ON_TRIP
+    if (req.status or "IN_PROGRESS") == "IN_PROGRESS":
+        cursor.execute("UPDATE vehicles SET status = 'ON_TRIP' WHERE id = ?", (req.vehicle_id,))
+
+    # Send notification to driver
+    helper_msg = f" with Helper: {helper_name}" if helper_name else " (Solo)"
+    send_notification(
+        conn, driver["user_id"], "Vehicle Trip Assigned",
+        f"You are assigned as Driver for Vehicle {veh['vehicle_number']} to {req.destination}{helper_msg}.",
+        "VEHICLE"
+    )
+
+    # Send notification to helper if assigned
+    if req.helper_id and helper:
+        send_notification(
+            conn, helper["user_id"], "Vehicle Trip Assigned (Helper)",
+            f"You are assigned as Helper for Vehicle {veh['vehicle_number']} with Driver {driver['name']} to {req.destination}.",
+            "VEHICLE"
+        )
+
+    log_audit(conn, admin["name"], "Created vehicle dispatch trip", f"Vehicle {veh['vehicle_number']}", f"Driver: {driver['name']}, Destination: {req.destination}")
+
+    conn.commit()
+    conn.close()
+    return {"message": "Vehicle trip logged successfully", "trip_id": trip_id}
+
+@app.put("/api/admin/vehicle-trips/{trip_id}")
+def update_vehicle_trip(trip_id: int, req: TripUpdate, admin: dict = Depends(require_admin)):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT vt.*, v.vehicle_number FROM vehicle_trips vt JOIN vehicles v ON vt.vehicle_id = v.id WHERE vt.id = ?", (trip_id,))
+    trip = cursor.fetchone()
+    if not trip:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Trip record not found")
+
+    end_time = req.trip_end_time or (datetime.now().strftime("%I:%M %p") if req.status == "COMPLETED" else trip["trip_end_time"])
+
+    cursor.execute("""
+        UPDATE vehicle_trips SET
+            trip_end_time = COALESCE(?, trip_end_time),
+            end_km = COALESCE(?, end_km),
+            status = COALESCE(?, status),
+            notes = COALESCE(?, notes)
+        WHERE id = ?
+    """, (end_time, req.end_km, req.status, req.notes, trip_id))
+
+    # Free up the vehicle if trip completed or cancelled
+    if req.status in ["COMPLETED", "CANCELLED"]:
+        cursor.execute("UPDATE vehicles SET status = 'AVAILABLE' WHERE id = ?", (trip["vehicle_id"],))
+
+    log_audit(conn, admin["name"], "Updated vehicle trip", f"Trip #{trip_id} ({trip['vehicle_number']})", f"Status: {req.status}")
+    conn.commit()
+    conn.close()
+    return {"message": "Trip updated successfully"}
+
+@app.delete("/api/admin/vehicle-trips/{trip_id}")
+def delete_vehicle_trip(trip_id: int, admin: dict = Depends(require_admin)):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM vehicle_trips WHERE id = ?", (trip_id,))
+    log_audit(conn, admin["name"], "Deleted vehicle trip log", f"Trip #{trip_id}")
+    conn.commit()
+    conn.close()
+    return {"message": "Trip deleted successfully"}
 
 # ----------------- Static Frontend Mount -----------------
 

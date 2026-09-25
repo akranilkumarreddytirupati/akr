@@ -20,14 +20,15 @@ def seed_database():
 
     # 1. Admin Account
     cursor.execute("""
-        INSERT INTO users (employee_id, name, email, phone, password_hash, role, account_status, profile_image, joining_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO users (employee_id, name, email, phone, password_hash, plain_password, role, account_status, profile_image, joining_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         "ADM-0001",
         "Vikram Malhotra (Courier Hub Manager)",
         "admin@courier.com",
         "+91 98765 43210",
         hash_password("Admin@123"),
+        "Admin@123",
         "ADMIN",
         "ACTIVE",
         "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
@@ -188,14 +189,15 @@ def seed_database():
     for emp in employees_data:
         daily_sal = round(emp["monthly_salary"] / emp["working_days"], 2)
         cursor.execute("""
-            INSERT INTO users (employee_id, name, email, phone, password_hash, role, account_status, joining_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO users (employee_id, name, email, phone, password_hash, plain_password, role, account_status, joining_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             emp["code"],
             emp["name"],
             emp["email"],
             emp["phone"],
             hash_password("Worker@123"), # Easy default for workers
+            "Worker@123",
             "WORKER",
             emp["account_status"],
             emp["joining_date"]

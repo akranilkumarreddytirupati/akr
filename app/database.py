@@ -164,6 +164,63 @@ def init_db():
     );
     """)
 
+    # Vehicles master table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS vehicles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        vehicle_number TEXT NOT NULL UNIQUE,
+        model_name TEXT,
+        vehicle_type TEXT DEFAULT 'Delivery Van',
+        status TEXT NOT NULL DEFAULT 'AVAILABLE' CHECK (status IN ('AVAILABLE', 'ON_TRIP', 'MAINTENANCE')),
+        notes TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+
+    # Vehicle Trips / Logs table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS vehicle_trips (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        vehicle_id INTEGER NOT NULL,
+        driver_id INTEGER NOT NULL,
+        helper_id INTEGER,
+        trip_date TEXT NOT NULL,
+        trip_start_time TEXT,
+        trip_end_time TEXT,
+        start_location TEXT DEFAULT 'Hub',
+        destination TEXT NOT NULL,
+        purpose TEXT,
+        status TEXT NOT NULL DEFAULT 'IN_PROGRESS' CHECK (status IN ('IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
+        start_km REAL DEFAULT 0.0,
+        end_km REAL DEFAULT 0.0,
+        notes TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE,
+        FOREIGN KEY (driver_id) REFERENCES employees(id) ON DELETE CASCADE,
+        FOREIGN KEY (helper_id) REFERENCES employees(id) ON DELETE SET NULL
+    );
+    """)
+
+    # Run auto-migration for plain_password in users if not present
+    cursor.execute("PRAGMA table_info(users)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if "plain_password" not in columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN plain_password TEXT")
+
+    # Pre-seed sample vehicles if table is empty
+    cursor.execute("SELECT COUNT(*) as cnt FROM vehicles")
+    if cursor.fetchone()[0] == 0:
+        sample_vehicles = [
+            ("AP 39 TE 1234", "Tata Ace Gold (Chota Hathi)", "Mini Truck", "AVAILABLE", "Primary local delivery van"),
+            ("AP 39 TK 5678", "Mahindra Bolero Maxi Truck", "Pickup", "AVAILABLE", "Highway & heavy delivery"),
+            ("AP 03 BX 9012", "Eicher Pro 2049", "Heavy Commercial", "AVAILABLE", "Inter-city hub transfer"),
+            ("AP 39 EV 4321", "Piaggio Ape E-Xtra EV", "Three Wheeler EV", "AVAILABLE", "Local parcel express")
+        ]
+        cursor.executemany("""
+            INSERT INTO vehicles (vehicle_number, model_name, vehicle_type, status, notes)
+            VALUES (?, ?, ?, ?, ?)
+        """, sample_vehicles)
+
     # Default settings
     default_settings = [
         ("working_days_per_month", "26", "Default working days in a month for salary calculation"),
@@ -184,19 +241,26 @@ def init_db():
         admin_hash = f"{salt}${binascii.hexlify(key).decode('utf-8')}"
 
         cursor.execute("""
-            INSERT INTO users (employee_id, name, email, phone, password_hash, role, account_status, profile_image, joining_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO users (employee_id, name, email, phone, password_hash, plain_password, role, account_status, profile_image, joining_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             "ADM-0001",
             "Courier Hub Manager",
             "admin@courier.com",
             "+91 98765 43210",
             admin_hash,
+            "Admin@123",
             "ADMIN",
             "ACTIVE",
             "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
             "2024-01-01"
         ))
+    else:
+        # Ensure existing admin has plain_password set
+        cursor.execute("UPDATE users SET plain_password = 'Admin@123' WHERE role = 'ADMIN' AND (plain_password IS NULL OR plain_password = '')")
+    
+    # Ensure any existing worker accounts have a fallback password stored
+    cursor.execute("UPDATE users SET plain_password = 'Worker@123' WHERE role = 'WORKER' AND (plain_password IS NULL OR plain_password = '')")
 
     conn.commit()
     conn.close()

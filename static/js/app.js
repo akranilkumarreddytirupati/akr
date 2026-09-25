@@ -448,6 +448,7 @@ function buildSidebarNavigation() {
   const adminNav = [
     { id: "dashboard", label: "Dashboard", icon: "📊" },
     { id: "employees", label: "Employees", icon: "👥" },
+    { id: "vehicles", label: "Vehicles & Trips", icon: "🚚" },
     { id: "attendance", label: "Attendance", icon: "⏱️" },
     { id: "salary", label: "Salary Management", icon: "💰" },
     { id: "advances", label: "Advances", icon: "💸" },
@@ -510,7 +511,8 @@ function navigateTo(viewId) {
   // Update Topbar
   const titles = {
     dashboard: ["Admin Dashboard", "Courier Hub operations, attendance summary & financial statistics"],
-    employees: ["Employee Management", "Directory, recruitment onboarding, status control & profile details"],
+    employees: ["Employee Management", "Directory, credentials, status control & profile details"],
+    vehicles: ["Vehicles & Dispatch Trips", "Fleet tracking, driver & helper assignments, trip logs"],
     attendance: ["Attendance Management", "Daily logs, check-in/out stamps, working hours & administrative override"],
     salary: ["Salary Management", "Automatic absence & half-day deductions, monthly payroll generation & payments"],
     advances: ["Employee Advances", "Record advances, calculate balance deductions & view employee logs"],
@@ -534,6 +536,7 @@ function navigateTo(viewId) {
   // Render Target View
   if (viewId === "dashboard") renderAdminDashboard(viewC);
   else if (viewId === "employees") renderEmployeesView(viewC);
+  else if (viewId === "vehicles") renderVehiclesView(viewC);
   else if (viewId === "attendance") renderAttendanceView(viewC);
   else if (viewId === "salary") renderSalaryView(viewC);
   else if (viewId === "advances") renderAdvancesView(viewC);
@@ -788,6 +791,7 @@ async function renderEmployeesView(container) {
               <tr>
                 <th>Emp ID</th>
                 <th>Employee Name</th>
+                <th>Login Credentials</th>
                 <th>Position</th>
                 <th>Phone</th>
                 <th>Monthly Salary</th>
@@ -807,6 +811,16 @@ async function renderEmployeesView(container) {
                       <div>
                         <div style="font-weight: 600;">${emp.name}</div>
                         <div style="font-size: 12px; color: #64748b;">${emp.email}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 10px; font-size: 12px; display: inline-flex; flex-direction: column; gap: 3px;">
+                      <div><span style="color: #64748b; font-weight: 600;">User:</span> <code style="font-weight: 700; color: #1e293b;">${emp.employee_code}</code></div>
+                      <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="color: #64748b; font-weight: 600;">Pass:</span>
+                        <span id="pwd-text-${emp.id}" style="font-family: monospace; font-weight: 700; color: #0284c7;">••••••••</span>
+                        <button type="button" class="btn btn-secondary btn-sm" style="padding: 1px 6px; font-size: 11px;" onclick="togglePasswordVisibility(${emp.id}, '${(emp.plain_password || 'Worker@123').replace(/'/g, "\\'")}')" title="Show/Hide Password">👁️</button>
                       </div>
                     </div>
                   </td>
@@ -1077,6 +1091,11 @@ function openEditEmployeeModal(emp) {
         <label>Residential Address</label>
         <input type="text" id="edit-address" class="form-control" value="${emp.address || ''}">
       </div>
+      <div class="form-group" style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px dashed #cbd5e1;">
+        <label style="color: #0284c7; font-weight: 700; margin-bottom: 4px; display: block;">Login Password (Current / Reset)</label>
+        <input type="text" id="edit-password" class="form-control" value="${emp.plain_password || ''}" placeholder="Enter new password to reset">
+        <span style="font-size: 11.5px; color: #64748b; margin-top: 4px; display: block;">Admin can view or change the employee's login password here anytime.</span>
+      </div>
       <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px;">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
         <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -1088,6 +1107,7 @@ function openEditEmployeeModal(emp) {
 async function submitEditEmployee(e, empId) {
   e.preventDefault();
   const photoBase64 = document.getElementById("edit-photo-base64") ? document.getElementById("edit-photo-base64").value : null;
+  const newPwd = document.getElementById("edit-password") ? document.getElementById("edit-password").value.trim() : null;
   const payload = {
     name: document.getElementById("edit-name").value,
     email: document.getElementById("edit-email").value,
@@ -1095,7 +1115,8 @@ async function submitEditEmployee(e, empId) {
     position: document.getElementById("edit-position").value,
     monthly_salary: parseFloat(document.getElementById("edit-salary").value),
     address: document.getElementById("edit-address").value,
-    profile_image: photoBase64 || null
+    profile_image: photoBase64 || null,
+    password: newPwd || undefined
   };
 
   try {
@@ -1147,6 +1168,18 @@ async function deleteEmployee(empId, empName, empCode) {
   }
 }
 
+function togglePasswordVisibility(empId, plainPwd) {
+  const el = document.getElementById(`pwd-text-${empId}`);
+  if (!el) return;
+  if (el.innerText === "••••••••") {
+    el.innerText = plainPwd;
+    el.style.color = "#16a34a"; // green
+  } else {
+    el.innerText = "••••••••";
+    el.style.color = "#0284c7"; // blue
+  }
+}
+
 // Complete Employee Profile Modal
 async function viewEmployeeProfile(empId) {
   try {
@@ -1161,6 +1194,17 @@ async function viewEmployeeProfile(empId) {
           <p style="font-size: 13px; color: #64748b;">${emp.position} • <strong>${emp.employee_code}</strong></p>
           <span class="status-pill ${emp.account_status === 'ACTIVE' ? 'status-active' : 'status-pending'}" style="margin-top: 4px;">${emp.account_status}</span>
         </div>
+      </div>
+
+      <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <span style="font-size: 11px; font-weight: 700; color: #1e40af; text-transform: uppercase;">Login Credentials</span>
+          <div style="font-size: 13.5px; margin-top: 3px;">
+            <strong>Username / ID:</strong> <code style="font-weight: 700; color: #1d4ed8;">${emp.employee_code}</code> &nbsp;|&nbsp; 
+            <strong>Password:</strong> <span style="font-family: monospace; font-weight: 700; color: #0284c7;">${emp.plain_password || 'Worker@123'}</span>
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText('ID: ${emp.employee_code}\\nPassword: ${emp.plain_password || 'Worker@123'}'); showToast('Credentials copied to clipboard!', 'success');">📋 Copy</button>
       </div>
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; font-size: 13px;">
@@ -1202,6 +1246,381 @@ async function viewEmployeeProfile(empId) {
         </div>
       </div>
     `, `<button class="btn btn-secondary" onclick="closeModal()">Close</button>`);
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+// ----------------- VEHICLES & TRIPS MANAGEMENT -----------------
+async function renderVehiclesView(container) {
+  container.innerHTML = `<div style="text-align: center; padding: 40px;"><p>Loading fleet and trip records...</p></div>`;
+  try {
+    const [vehicles, trips, employees] = await Promise.all([
+      apiRequest("/vehicles"),
+      apiRequest("/vehicle-trips"),
+      apiRequest("/admin/employees")
+    ]);
+
+    // Active drivers/helpers filter
+    const activeStaff = employees.filter(e => e.status === "ACTIVE" && e.account_status === "ACTIVE");
+
+    container.innerHTML = `
+      <!-- Top Actions & Vehicle Summary Cards -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <h2 style="font-size: 18px; font-weight: 700;">🚚 Fleet & Delivery Trips</h2>
+          <span class="status-pill status-active">${vehicles.length} Vehicles</span>
+          <span class="status-pill status-pending">${trips.filter(t => t.status === 'IN_PROGRESS').length} Active Trips</span>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-secondary" onclick="openAddVehicleModal()">
+            <span>➕</span> Add Vehicle
+          </button>
+          <button class="btn btn-primary" onclick="openDispatchTripModal(${JSON.stringify(vehicles).replace(/"/g, '&quot;')}, ${JSON.stringify(activeStaff).replace(/"/g, '&quot;')})">
+            <span>🚀</span> Log New Trip (Driver & Helper)
+          </button>
+        </div>
+      </div>
+
+      <!-- Vehicles Fleet Overview Grid -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-bottom: 24px;">
+        ${vehicles.map(v => `
+          <div class="card" style="padding: 16px; border-top: 4px solid ${v.status === 'AVAILABLE' ? '#10b981' : v.status === 'ON_TRIP' ? '#3b82f6' : '#ef4444'};">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+              <div>
+                <div style="font-size: 16px; font-weight: 800; color: #1e293b;">${v.vehicle_number}</div>
+                <div style="font-size: 12.5px; color: #64748b;">${v.model_name || v.vehicle_type}</div>
+              </div>
+              <span class="status-pill ${v.status === 'AVAILABLE' ? 'status-active' : v.status === 'ON_TRIP' ? 'status-pending' : 'status-deactivated'}">
+                ${v.status === 'ON_TRIP' ? 'On Trip' : v.status === 'AVAILABLE' ? 'Available' : 'Maintenance'}
+              </span>
+            </div>
+            <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
+              <div>Type: <strong>${v.vehicle_type}</strong></div>
+              <div>Total Completed Trips: <strong>${v.total_trips || 0}</strong></div>
+              ${v.last_trip_date ? `<div>Last Trip: <strong>${formatDate(v.last_trip_date)}</strong></div>` : ''}
+            </div>
+            <div style="display: flex; gap: 6px; margin-top: 12px; justify-content: flex-end;">
+              ${v.status === 'AVAILABLE' ? `
+                <button class="btn btn-secondary btn-sm" onclick="setVehicleStatus(${v.id}, 'MAINTENANCE')" title="Mark for Maintenance">🔧 Service</button>
+              ` : `
+                <button class="btn btn-success btn-sm" onclick="setVehicleStatus(${v.id}, 'AVAILABLE')" title="Set Available">✓ Available</button>
+              `}
+              <button class="btn btn-danger btn-sm" onclick="deleteVehicleItem(${v.id}, '${v.vehicle_number}')" title="Delete Vehicle">🗑️</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- Trip Logs Table -->
+      <div class="card">
+        <div class="card-header" style="justify-content: space-between;">
+          <h2>Vehicle Trip History & Personnel Roster</h2>
+          <span style="font-size: 13px; color: #64748b;">Tracks driver, helper, vehicle and destination</span>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Trip ID</th>
+                <th>Trip Date & Time</th>
+                <th>Vehicle</th>
+                <th>Driver (Person In-Charge)</th>
+                <th>Helper (Assistant)</th>
+                <th>Destination / Purpose</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${trips.length === 0 ? `
+                <tr><td colspan="8" style="text-align: center; padding: 24px; color: #64748b;">No vehicle dispatch trips recorded yet. Click "Log New Trip" to record who went in the vehicle.</td></tr>
+              ` : trips.map(t => `
+                <tr>
+                  <td><strong>#TRIP-${t.id}</strong></td>
+                  <td>
+                    <div><strong>${formatDate(t.trip_date)}</strong></div>
+                    <div style="font-size: 12px; color: #64748b;">${t.trip_start_time || ''} ${t.trip_end_time ? '→ ' + t.trip_end_time : ''}</div>
+                  </td>
+                  <td>
+                    <div style="font-weight: 700; color: #1e293b;">${t.vehicle_number}</div>
+                    <div style="font-size: 11px; color: #64748b;">${t.model_name || t.vehicle_type}</div>
+                  </td>
+                  <td>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span style="font-size: 18px;">👨‍✈️</span>
+                      <div>
+                        <div style="font-weight: 700; color: #0f172a;">${t.driver_name}</div>
+                        <div style="font-size: 11px; color: #64748b;">${t.driver_code} • ${t.driver_phone || ''}</div>
+                        <span style="font-size: 10px; background: #e0f2fe; color: #0369a1; padding: 1px 6px; border-radius: 4px; font-weight: 700;">DRIVER</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    ${t.helper_name ? `
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 18px;">🤝</span>
+                        <div>
+                          <div style="font-weight: 700; color: #0f172a;">${t.helper_name}</div>
+                          <div style="font-size: 11px; color: #64748b;">${t.helper_code || ''} • ${t.helper_phone || ''}</div>
+                          <span style="font-size: 10px; background: #fef3c7; color: #92400e; padding: 1px 6px; border-radius: 4px; font-weight: 700;">HELPER</span>
+                        </div>
+                      </div>
+                    ` : `
+                      <span style="color: #94a3b8; font-style: italic; font-size: 12px;">Solo (No Helper)</span>
+                    `}
+                  </td>
+                  <td>
+                    <div style="font-weight: 600;">📍 ${t.destination}</div>
+                    <div style="font-size: 12px; color: #64748b;">${t.purpose || 'Delivery'}</div>
+                    ${t.notes ? `<div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Note: ${t.notes}</div>` : ''}
+                  </td>
+                  <td>
+                    <span class="status-pill ${t.status === 'COMPLETED' ? 'status-active' : t.status === 'IN_PROGRESS' ? 'status-pending' : 'status-deactivated'}">
+                      ${t.status === 'IN_PROGRESS' ? 'In Transit' : t.status}
+                    </span>
+                  </td>
+                  <td>
+                    <div style="display: flex; gap: 6px;">
+                      ${t.status === 'IN_PROGRESS' ? `
+                        <button class="btn btn-success btn-sm" onclick="completeTrip(${t.id})" title="Mark Trip Completed & Free Vehicle">✓ End Trip</button>
+                      ` : ''}
+                      <button class="btn btn-danger btn-sm" onclick="deleteTripItem(${t.id})" title="Delete Trip Record">🗑️</button>
+                    </div>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<div class="card" style="padding: 24px; color: red;">Failed to load vehicles: ${err.message}</div>`;
+  }
+}
+
+function openAddVehicleModal() {
+  openModal("Add New Fleet Vehicle", `
+    <form id="add-vehicle-form" onsubmit="submitAddVehicle(event)">
+      <div class="form-group">
+        <label>Vehicle Plate / Registration Number *</label>
+        <input type="text" id="veh-number" class="form-control" placeholder="e.g. AP 39 TE 1234" required style="text-transform: uppercase;">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Model / Name</label>
+          <input type="text" id="veh-model" class="form-control" placeholder="Tata Ace / Bolero / Eicher">
+        </div>
+        <div class="form-group">
+          <label>Vehicle Type</label>
+          <select id="veh-type" class="form-control">
+            <option value="Delivery Van">Delivery Van</option>
+            <option value="Mini Truck">Mini Truck (Chota Hathi)</option>
+            <option value="Pickup Truck">Pickup Truck</option>
+            <option value="Heavy Commercial">Heavy Commercial</option>
+            <option value="Two Wheeler / Bike">Two Wheeler / Bike</option>
+            <option value="Electric Vehicle (EV)">Electric Vehicle (EV)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notes / Vehicle Specs</label>
+        <textarea id="veh-notes" class="form-control" rows="2" placeholder="Primary hub route, payload capacity, etc."></textarea>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Vehicle</button>
+      </div>
+    </form>
+  `);
+}
+
+async function submitAddVehicle(e) {
+  e.preventDefault();
+  const payload = {
+    vehicle_number: document.getElementById("veh-number").value.trim().toUpperCase(),
+    model_name: document.getElementById("veh-model").value.trim(),
+    vehicle_type: document.getElementById("veh-type").value,
+    notes: document.getElementById("veh-notes").value.trim()
+  };
+  try {
+    const res = await apiRequest("/admin/vehicles", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    showToast(res.message, "success");
+    closeModal();
+    renderVehiclesView(document.getElementById("view-container"));
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+async function setVehicleStatus(vehId, status) {
+  try {
+    const res = await apiRequest(`/admin/vehicles/${vehId}/status`, {
+      method: "PUT",
+      body: JSON.stringify({ status })
+    });
+    showToast(res.message, "success");
+    renderVehiclesView(document.getElementById("view-container"));
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+async function deleteVehicleItem(vehId, num) {
+  if (!confirm(`Are you sure you want to remove vehicle ${num}?`)) return;
+  try {
+    const res = await apiRequest(`/admin/vehicles/${vehId}`, { method: "DELETE" });
+    showToast(res.message, "success");
+    renderVehiclesView(document.getElementById("view-container"));
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+function openDispatchTripModal(vehicles, employees) {
+  const today = new Date().toISOString().split("T")[0];
+  const nowTime = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+  openModal("🚀 Log Vehicle Dispatch Trip (Assign Personnel)", `
+    <form id="dispatch-trip-form" onsubmit="submitDispatchTrip(event)">
+      <div class="form-group">
+        <label>Select Vehicle *</label>
+        <select id="trip-vehicle" class="form-control" required>
+          <option value="">-- Choose Vehicle --</option>
+          ${vehicles.map(v => `<option value="${v.id}">${v.vehicle_number} (${v.model_name || v.vehicle_type}) - [${v.status}]</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>👨‍✈️ Driver (Assigned Person) *</label>
+          <select id="trip-driver" class="form-control" required>
+            <option value="">-- Select Driver --</option>
+            ${employees.map(e => `<option value="${e.id}">${e.name} (${e.employee_code}) - ${e.position}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>🤝 Helper / Assistant (Optional)</label>
+          <select id="trip-helper" class="form-control">
+            <option value="">-- None (Solo Driver) --</option>
+            ${employees.map(e => `<option value="${e.id}">${e.name} (${e.employee_code}) - ${e.position}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Trip Date *</label>
+          <input type="date" id="trip-date" class="form-control" value="${today}" required>
+        </div>
+        <div class="form-group">
+          <label>Departure Time *</label>
+          <input type="text" id="trip-time" class="form-control" value="${nowTime}" required>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Start Location</label>
+          <input type="text" id="trip-start" class="form-control" value="AKR Central Hub">
+        </div>
+        <div class="form-group">
+          <label>Destination Route / Area *</label>
+          <input type="text" id="trip-dest" class="form-control" placeholder="e.g. Sector 18 & Noida Extension" required>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Purpose</label>
+          <input type="text" id="trip-purpose" class="form-control" value="Parcel Express Delivery">
+        </div>
+        <div class="form-group">
+          <label>Starting Odometer (KM)</label>
+          <input type="number" id="trip-km" class="form-control" value="0" min="0">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Trip Notes / Manifest Info</label>
+        <textarea id="trip-notes" class="form-control" rows="2" placeholder="Bag count, parcels loaded, specific route notes"></textarea>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Dispatch Vehicle & Notify Staff</button>
+      </div>
+    </form>
+  `);
+}
+
+async function submitDispatchTrip(e) {
+  e.preventDefault();
+  const vId = parseInt(document.getElementById("trip-vehicle").value);
+  const dId = parseInt(document.getElementById("trip-driver").value);
+  const hVal = document.getElementById("trip-helper").value;
+  const hId = hVal ? parseInt(hVal) : null;
+
+  if (hId && dId === hId) {
+    showToast("The driver and helper cannot be the same person. Please choose different employees.", "error");
+    return;
+  }
+
+  const payload = {
+    vehicle_id: vId,
+    driver_id: dId,
+    helper_id: hId,
+    trip_date: document.getElementById("trip-date").value,
+    trip_start_time: document.getElementById("trip-time").value,
+    start_location: document.getElementById("trip-start").value,
+    destination: document.getElementById("trip-dest").value.trim(),
+    purpose: document.getElementById("trip-purpose").value.trim(),
+    start_km: parseFloat(document.getElementById("trip-km").value) || 0.0,
+    notes: document.getElementById("trip-notes").value.trim()
+  };
+
+  try {
+    const res = await apiRequest("/admin/vehicle-trips", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    showToast(res.message, "success");
+    closeModal();
+    renderVehiclesView(document.getElementById("view-container"));
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+async function completeTrip(tripId) {
+  const endKm = prompt("Enter final odometer reading (KM) (or leave blank):", "");
+  const payload = {
+    status: "COMPLETED",
+    end_km: endKm ? parseFloat(endKm) : undefined
+  };
+
+  try {
+    const res = await apiRequest(`/admin/vehicle-trips/${tripId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload)
+    });
+    showToast(res.message, "success");
+    renderVehiclesView(document.getElementById("view-container"));
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+async function deleteTripItem(tripId) {
+  if (!confirm(`Are you sure you want to delete trip #TRIP-${tripId}?`)) return;
+  try {
+    const res = await apiRequest(`/admin/vehicle-trips/${tripId}`, { method: "DELETE" });
+    showToast(res.message, "success");
+    renderVehiclesView(document.getElementById("view-container"));
   } catch (err) {
     showToast(err.message, "error");
   }

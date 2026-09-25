@@ -137,13 +137,14 @@ def restore_data_from_firestore(sqlite_conn) -> bool:
             u = doc.to_dict()
             try:
                 cursor.execute("""
-                    INSERT INTO users (id, employee_id, name, email, phone, password_hash, role, account_status, profile_image, joining_date, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO users (id, employee_id, name, email, phone, password_hash, plain_password, role, account_status, profile_image, joining_date, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
                         name=excluded.name,
                         email=excluded.email,
                         phone=excluded.phone,
                         password_hash=excluded.password_hash,
+                        plain_password=excluded.plain_password,
                         role=excluded.role,
                         account_status=excluded.account_status,
                         profile_image=excluded.profile_image,
@@ -156,6 +157,7 @@ def restore_data_from_firestore(sqlite_conn) -> bool:
                     u.get("email"),
                     u.get("phone"),
                     u.get("password_hash"),
+                    u.get("plain_password"),
                     u.get("role"),
                     u.get("account_status", "ACTIVE"),
                     u.get("profile_image"),
