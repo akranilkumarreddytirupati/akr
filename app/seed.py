@@ -9,32 +9,38 @@ def seed_database():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Check if admin already exists
-    cursor.execute("SELECT id FROM users WHERE role = 'ADMIN'")
-    if cursor.fetchone():
-        print("Database already seeded.")
+    # Check if employees already exist
+    cursor.execute("SELECT COUNT(*) FROM employees")
+    emp_count = cursor.fetchone()[0]
+    if emp_count > 0:
+        print("Database already contains employees.")
         conn.close()
         return
 
-    print("Seeding database with Courier Office Admin and 10+ Employees...")
+    print("Seeding database with default workforce...")
 
-    # 1. Admin Account
-    cursor.execute("""
-        INSERT INTO users (employee_id, name, email, phone, password_hash, plain_password, role, account_status, profile_image, joining_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        "ADM-0001",
-        "Vikram Malhotra (Courier Hub Manager)",
-        "admin@courier.com",
-        "+91 98765 43210",
-        hash_password("Admin@123"),
-        "Admin@123",
-        "ADMIN",
-        "ACTIVE",
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-        "2023-01-15"
-    ))
-    admin_id = cursor.lastrowid
+    # 1. Admin Account check
+    cursor.execute("SELECT id FROM users WHERE role = 'ADMIN'")
+    admin_row = cursor.fetchone()
+    if not admin_row:
+        cursor.execute("""
+            INSERT INTO users (employee_id, name, email, phone, password_hash, plain_password, role, account_status, profile_image, joining_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            "ADM-0001",
+            "Vikram Malhotra (Courier Hub Manager)",
+            "admin@courier.com",
+            "+91 98765 43210",
+            hash_password("Admin@123"),
+            "Admin@123",
+            "ADMIN",
+            "ACTIVE",
+            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+            "2023-01-15"
+        ))
+        admin_id = cursor.lastrowid
+    else:
+        admin_id = admin_row[0]
 
     # 2. Employees dataset
     employees_data = [
