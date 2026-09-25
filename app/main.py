@@ -13,6 +13,7 @@ from app.database import get_db_connection, init_db
 from app.seed import seed_database
 from app.auth import hash_password, verify_password, create_access_token, get_current_user, require_admin, require_worker
 from app.services import log_audit, send_notification
+from app.firebase_db import restore_data_from_firestore, sync_document_to_firestore, delete_document_from_firestore
 
 app = FastAPI(title="Courier Office Employee Management System API")
 
@@ -42,6 +43,13 @@ app.add_middleware(
 def on_startup():
     init_db()
     seed_database()
+    # Restore persistent cloud data from Firestore if available
+    try:
+        conn = get_db_connection()
+        restore_data_from_firestore(conn)
+        conn.close()
+    except Exception as e:
+        print(f"Firestore startup restore notice: {e}")
 
 # ----------------- Pydantic Models -----------------
 
@@ -187,13 +195,37 @@ def register_worker(req: RegisterRequest):
                       "Your registration as a worker has been submitted. An administrator will review and activate your account shortly.", "ACCOUNT")
 
     # Send notification to Admin(s)
-    cursor.execute("SELECT id FROM users WHERE role = 'ADMIN'")
-    admins = cursor.fetchall()
-    for adm in admins:
-        send_notification(conn, adm["id"], "New Worker Registration", 
-                          f"Worker {req.name} ({emp_code}) registered and is awaiting your approval.", "APPROVAL")
-
     conn.commit()
+
+    # Sync to Firestore
+    sync_document_to_firestore("users", str(user_id), {
+        "id": user_id,
+        "employee_id": emp_code,
+        "name": req.name,
+        "email": req.email,
+        "phone": req.phone,
+        "password_hash": hashed,
+        "role": "WORKER",
+        "account_status": "PENDING",
+        "profile_image": req.profile_image,
+        "joining_date": now_str
+    })
+    cursor.execute("SELECT id FROM employees WHERE user_id = ?", (user_id,))
+    new_emp_row = cursor.fetchone()
+    if new_emp_row:
+        sync_document_to_firestore("employees", str(new_emp_row["id"]), {
+            "id": new_emp_row["id"],
+            "user_id": user_id,
+            "employee_code": emp_code,
+            "position": req.position,
+            "address": req.address,
+            "monthly_salary": sal,
+            "daily_salary": daily_sal,
+            "salary_effective_date": now_str,
+            "status": "ACTIVE",
+            "working_days_per_month": 26
+        })
+
     conn.close()
 
     return {
@@ -577,6 +609,17 @@ def update_employee(emp_id: int, req: EmployeeUpdate, admin: dict = Depends(requ
         send_notification(conn, user_id, "Salary Updated", f"Your monthly salary has been updated to ₹{req.monthly_salary:,.2f}.", "SALARY")
 
     conn.commit()
+
+    # Sync update to Firestore
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    u_row = cursor.fetchone()
+    if u_row:
+        sync_document_to_firestore("users", str(user_id), dict(u_row))
+    cursor.execute("SELECT * FROM employees WHERE id = ?", (emp_id,))
+    e_row = cursor.fetchone()
+    if e_row:
+        sync_document_to_firestore("employees", str(emp_id), dict(e_row))
+
     conn.close()
     return {"message": "Employee updated successfully"}
 
@@ -613,6 +656,17 @@ def change_employee_status(emp_id: int, payload: dict, admin: dict = Depends(req
         raise HTTPException(status_code=400, detail="Invalid action")
 
     conn.commit()
+
+    # Sync to Firestore
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    u_row = cursor.fetchone()
+    if u_row:
+        sync_document_to_firestore("users", str(user_id), dict(u_row))
+    cursor.execute("SELECT * FROM employees WHERE id = ?", (emp_id,))
+    e_row = cursor.fetchone()
+    if e_row:
+        sync_document_to_firestore("employees", str(emp_id), dict(e_row))
+
     conn.close()
     return {"message": f"Employee status updated to {action}"}
 
@@ -643,6 +697,11 @@ def delete_employee(emp_id: int, admin: dict = Depends(require_admin)):
     log_audit(conn, admin["name"], "Removed/Deleted employee", f"{emp_name} ({emp_code})", "Employee and all related records removed from system.")
 
     conn.commit()
+
+    # Sync deletion to Firestore
+    delete_document_from_firestore("employees", str(emp_id))
+    delete_document_from_firestore("users", str(user_id))
+
     conn.close()
     return {"message": f"Employee {emp_name} ({emp_code}) removed successfully"}
 
@@ -717,6 +776,13 @@ def worker_check_in(current_user: dict = Depends(require_worker)):
     send_notification(conn, current_user["id"], "Check-In Recorded", f"Check-in successfully recorded at {now_time} on {today_str}.", "ATTENDANCE")
 
     conn.commit()
+
+    # Sync attendance to Firestore
+    cursor.execute("SELECT * FROM attendance WHERE employee_id = ? AND date = ?", (emp_id, today_str))
+    att_row = cursor.fetchone()
+    if att_row:
+        sync_document_to_firestore("attendance", f"{emp_id}_{today_str}", dict(att_row))
+
     conn.close()
     return {"message": "Check-in successful!", "time": now_time, "date": today_str}
 
@@ -752,6 +818,13 @@ def worker_check_out(current_user: dict = Depends(require_worker)):
                       f"Check-out recorded at {now_time}. Total shift: {format_minutes_to_hours(mins)}.", "ATTENDANCE")
 
     conn.commit()
+
+    # Sync check-out update to Firestore
+    cursor.execute("SELECT * FROM attendance WHERE id = ?", (record["id"],))
+    att_row = cursor.fetchone()
+    if att_row:
+        sync_document_to_firestore("attendance", f"{emp_id}_{today_str}", dict(att_row))
+
     conn.close()
     return {
         "message": "Check-out successful!", 
@@ -827,8 +900,16 @@ def admin_mark_attendance(req: AttendanceMark, admin: dict = Depends(require_adm
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (req.employee_id, req.date, req.status, req.check_in_time, req.check_out_time, mins, req.leave_type, req.notes))
         log_audit(conn, admin["name"], "Admin marked attendance", f"{emp_info['name']} ({emp_info['employee_code']})", f"Date: {req.date}, Status: {req.status}")
+        send_notification(conn, emp_info["user_id"], "Attendance Recorded", f"Your attendance for {req.date} was marked as {req.status}.", "ATTENDANCE")
 
     conn.commit()
+
+    # Sync attendance to Firestore
+    cursor.execute("SELECT * FROM attendance WHERE employee_id = ? AND date = ?", (req.employee_id, req.date))
+    att_row = cursor.fetchone()
+    if att_row:
+        sync_document_to_firestore("attendance", f"{req.employee_id}_{req.date}", dict(att_row))
+
     conn.close()
     return {"message": "Attendance saved successfully"}
 
@@ -900,6 +981,13 @@ def create_advance(req: AdvanceCreate, admin: dict = Depends(require_admin)):
     log_audit(conn, admin["name"], "Added employee advance", f"{emp['name']} ({emp['employee_code']})", f"Amount: ₹{req.amount:,.2f} ({req.payment_type or 'Cash'}), Reason: {req.reason}")
 
     conn.commit()
+
+    # Sync advance to Firestore
+    cursor.execute("SELECT * FROM advances WHERE id = ?", (adv_id,))
+    adv_row = cursor.fetchone()
+    if adv_row:
+        sync_document_to_firestore("advances", str(adv_id), dict(adv_row))
+
     conn.close()
     return {"message": "Advance recorded successfully", "advance_id": adv_id}
 
