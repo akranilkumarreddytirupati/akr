@@ -136,6 +136,48 @@ function startClock() {
   setInterval(update, 1000);
 }
 
+// Voice Announcement Function (SpeechSynthesis + Audio chime)
+function playVoiceAnnouncement(text) {
+  try {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel(); // cancel any active speech
+
+    // Play a gentle modern chime sound first using Web Audio API
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15); // A5
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.3);
+    } catch (soundErr) {
+      // AudioContext optional fallback
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.1;
+    utterance.volume = 1.0;
+    
+    // Choose pleasant Indian or natural English voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = voices.find(v => v.lang.includes("en-IN") || v.name.includes("India")) || 
+                           voices.find(v => v.lang.startsWith("en") && (v.name.includes("Natural") || v.name.includes("Google"))) ||
+                           voices.find(v => v.lang.startsWith("en"));
+    if (preferredVoice) utterance.voice = preferredVoice;
+
+    window.speechSynthesis.speak(utterance);
+  } catch (err) {
+    console.warn("Speech synthesis error:", err);
+  }
+}
+
 // Toast Notifications
 function showToast(message, type = "info") {
   const container = document.getElementById("toast-container");
@@ -1835,18 +1877,22 @@ async function submitEditAttendanceRecord(e, empId, dateStr) {
       body: JSON.stringify(payload)
     });
     showToast(res.message, "success");
+    playVoiceAnnouncement(`Attendance updated successfully as ${payload.status}`);
     closeModal();
     refreshAdminAttendance();
   } catch (err) {
     showToast(err.message, "error");
+    playVoiceAnnouncement("Attendance update failed: " + err.message);
   }
 }
 
 async function submitMarkAttendance(e) {
   e.preventDefault();
   const st = document.getElementById("mark-status").value;
+  const empSelect = document.getElementById("mark-emp-id");
+  const empText = empSelect.options[empSelect.selectedIndex] ? empSelect.options[empSelect.selectedIndex].text.split('-')[0].trim() : 'Employee';
   const payload = {
-    employee_id: parseInt(document.getElementById("mark-emp-id").value),
+    employee_id: parseInt(empSelect.value),
     date: document.getElementById("mark-date").value,
     status: st,
     check_in_time: (st === 'Absent' || st === 'Leave') ? null : document.getElementById("mark-in").value,
@@ -1860,10 +1906,16 @@ async function submitMarkAttendance(e) {
       body: JSON.stringify(payload)
     });
     showToast(res.message, "success");
+    if (st === "Present") {
+      playVoiceAnnouncement(`Attendance marked present successful for ${empText}!`);
+    } else {
+      playVoiceAnnouncement(`Attendance marked as ${st} for ${empText}!`);
+    }
     closeModal();
     refreshAdminAttendance();
   } catch (err) {
     showToast(err.message, "error");
+    playVoiceAnnouncement("Failed to mark attendance: " + err.message);
   }
 }
 
@@ -3175,9 +3227,11 @@ async function workerCheckIn() {
   try {
     const res = await apiRequest("/worker/check-in", { method: "POST" });
     showToast(res.message, "success");
+    playVoiceAnnouncement(`Attendance marked present successful! Welcome, ${currentUser.name}.`);
     renderWorkerDashboard(document.getElementById("view-container"));
   } catch (err) {
     showToast(err.message, "error");
+    playVoiceAnnouncement("Attendance check in failed: " + err.message);
   }
 }
 
@@ -3185,9 +3239,11 @@ async function workerCheckOut() {
   try {
     const res = await apiRequest("/worker/check-out", { method: "POST" });
     showToast(res.message, "success");
+    playVoiceAnnouncement(`Check out marked successful! Have a great evening, ${currentUser.name}.`);
     renderWorkerDashboard(document.getElementById("view-container"));
   } catch (err) {
     showToast(err.message, "error");
+    playVoiceAnnouncement("Check out failed: " + err.message);
   }
 }
 
