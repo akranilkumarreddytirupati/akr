@@ -43,13 +43,24 @@ app.add_middleware(
 def on_startup():
     init_db()
     seed_database()
-    # Restore persistent cloud data from Firestore if available
-    try:
-        conn = get_db_connection()
-        restore_data_from_firestore(conn)
-        conn.close()
-    except Exception as e:
-        print(f"Firestore startup restore notice: {e}")
+    # Restore persistent cloud data from Firestore asynchronously in background so app starts immediately
+    import threading
+    def background_restore():
+        try:
+            conn = get_db_connection()
+            restore_data_from_firestore(conn)
+            conn.close()
+        except Exception as e:
+            print(f"Firestore startup restore notice: {e}")
+
+    threading.Thread(target=background_restore, daemon=True).start()
+
+# ----------------- Health Check / Keep-Alive Ping -----------------
+
+@app.get("/healthz")
+@app.get("/ping")
+def ping():
+    return {"status": "ok", "app": "AKR Logistics", "timestamp": datetime.utcnow().isoformat()}
 
 # ----------------- Pydantic Models -----------------
 
